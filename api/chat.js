@@ -1,6 +1,6 @@
 export const config = {
   runtime: 'edge',
-  maxDuration: 60, // extend to 60s for web search calls
+  maxDuration: 60,
 };
 
 export default async function handler(req) {
@@ -9,7 +9,13 @@ export default async function handler(req) {
   }
 
   try {
-    const { messages, systemPrompt, useWebSearch } = await req.json();
+    const {
+      messages,
+      systemPrompt,
+      useWebSearch,
+      allowedDomains,
+      maxUses,
+    } = await req.json();
 
     const body = {
       model: 'claude-sonnet-4-6',
@@ -19,13 +25,23 @@ export default async function handler(req) {
     };
 
     if (useWebSearch) {
-      body.tools = [{ type: 'web_search_20250305', name: 'web_search' }];
+      const tool = {
+        type: 'web_search_20250305',
+        name: 'web_search',
+        max_uses: maxUses || 8,
+      };
+      // Pinning the domain is what makes results usable: without it the search
+      // returns articles *about* videos, which carry no on-platform URL.
+      if (Array.isArray(allowedDomains) && allowedDomains.length) {
+        tool.allowed_domains = allowedDomains;
+      }
+      body.tools = [tool];
     }
 
-    // 55s timeout — under Vercel's 60s limit
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 55000);
 
+    // No anthropic-beta header — web_search_20250305 is generally available.
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       signal: controller.signal,
@@ -33,7 +49,6 @@ export default async function handler(req) {
         'Content-Type': 'application/json',
         'x-api-key': process.env.ANTHROPIC_API_KEY,
         'anthropic-version': '2023-06-01',
-        'anthropic-beta': 'web-search-2025-03-05',
       },
       body: JSON.stringify(body),
     });
@@ -43,20 +58,33 @@ export default async function handler(req) {
     const data = await response.json();
 
     if (!response.ok) {
-      return new Response(JSON.stringify({ error: data }), {
-        status: response.status,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      const detail =
+        (data && data.error && data.error.message) ||
+        (typeof data === 'string' ? data : JSON.stringify(data));
+      return new Response(
+        JSON.stringify({ error: detail, status: response.status }),
+        { status: response.status, headers: { 'Content-Type': 'application/json' } }
+      );
     }
 
-    const text = data.content
+    const blocks = Array.isArray(data.content) ? data.content : [];
+    const text = blocks
       .filter(b => b.type === 'text')
       .map(b => b.text)
       .join('\n');
 
-    return new Response(JSON.stringify({ content: text }), {
-      headers: { 'Content-Type': 'application/json' },
-    });
+    // Surfaced so the client can tell "search ran and found nothing" apart
+    // from "search never ran".
+    const searchCalls = blocks.filter(b => b.type === 'server_tool_use').length;
+
+    return new Response(
+      JSON.stringify({
+        content: text,
+        searchCalls,
+        stopReason: data.stop_reason || null,
+      }),
+      { headers: { 'Content-Type': 'application/json' } }
+    );
 
   } catch (err) {
     const isTimeout = err.name === 'AbortError';
