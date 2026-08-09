@@ -13,7 +13,7 @@ export default async function handler(req) {
 
     const body = {
       model: 'claude-sonnet-4-6',
-      max_tokens: 2048,
+      max_tokens: useWebSearch ? 8192 : 2048,
       system: systemPrompt,
       messages,
     };
