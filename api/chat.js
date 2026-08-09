@@ -28,7 +28,7 @@ export default async function handler(req) {
       const tool = {
         type: 'web_search_20250305',
         name: 'web_search',
-        max_uses: maxUses || 8,
+        max_uses: maxUses || 4,
       };
       // Pinning the domain is what makes results usable: without it the search
       // returns articles *about* videos, which carry no on-platform URL.
@@ -39,7 +39,10 @@ export default async function handler(req) {
     }
 
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 55000);
+    // Must fire BEFORE the platform's own limit, otherwise Vercel kills the
+    // function and returns a plain-text error page instead of our JSON.
+    const budget = useWebSearch ? 20000 : 15000;
+    const timeout = setTimeout(() => controller.abort(), budget);
 
     // No anthropic-beta header — web_search_20250305 is generally available.
     const response = await fetch('https://api.anthropic.com/v1/messages', {
