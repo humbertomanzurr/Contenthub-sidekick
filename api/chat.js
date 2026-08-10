@@ -8,6 +8,7 @@ export default async function handler(req) {
     return new Response('Method not allowed', { status: 405 });
   }
 
+  const started = Date.now();
   try {
     const {
       messages,
@@ -28,7 +29,7 @@ export default async function handler(req) {
       const tool = {
         type: 'web_search_20250305',
         name: 'web_search',
-        max_uses: maxUses || 4,
+        max_uses: maxUses || 2,
       };
       // Pinning the domain is what makes results usable: without it the search
       // returns articles *about* videos, which carry no on-platform URL.
@@ -41,7 +42,7 @@ export default async function handler(req) {
     const controller = new AbortController();
     // Must fire BEFORE the platform's own limit, otherwise Vercel kills the
     // function and returns a plain-text error page instead of our JSON.
-    const budget = useWebSearch ? 20000 : 15000;
+    const budget = useWebSearch ? 22000 : 15000;
     const timeout = setTimeout(() => controller.abort(), budget);
 
     // No anthropic-beta header — web_search_20250305 is generally available.
@@ -84,6 +85,7 @@ export default async function handler(req) {
       JSON.stringify({
         content: text,
         searchCalls,
+        ms: Date.now() - started,
         stopReason: data.stop_reason || null,
       }),
       { headers: { 'Content-Type': 'application/json' } }
@@ -92,8 +94,9 @@ export default async function handler(req) {
   } catch (err) {
     const isTimeout = err.name === 'AbortError';
     return new Response(JSON.stringify({
-      error: isTimeout ? 'Request timed out — try again' : err.message,
+      error: isTimeout ? `Timed out after ${Date.now()-started}ms` : err.message,
       timeout: isTimeout,
+      ms: Date.now() - started,
     }), {
       status: isTimeout ? 504 : 500,
       headers: { 'Content-Type': 'application/json' },
