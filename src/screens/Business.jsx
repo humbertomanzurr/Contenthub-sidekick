@@ -938,7 +938,7 @@ function CreatorApp({user,profile,onLogout}){
           <span style={{background:C.accent+"18",color:C.accent,fontSize:9,fontWeight:700,padding:"2px 7px",borderRadius:20}}>Business</span>
         </div>
         <div style={{display:"flex",alignItems:"center",gap:3}}>
-          {[["dashboard","Dashboard"],["campaigns","Campaigns"],["analytics","Analytics"]].map(([id,label])=>(
+          {[["dashboard","Dashboard"],["campaigns","Brainstorm"],["analytics","Analytics"]].map(([id,label])=>(
             <button key={id} onClick={()=>setPage(id)} style={{padding:"5px 12px",border:"none",cursor:"pointer",fontSize:12,fontWeight:page===id?600:400,color:page===id?C.text:C.muted,background:page===id?C.light:"transparent",borderRadius:7}}>{label}</button>
           ))}
         </div>

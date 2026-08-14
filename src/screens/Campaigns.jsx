@@ -51,136 +51,15 @@ const campaignInsights=(refs=[])=>{
 
 // ── CAMPAIGN FILE ─────────────────────────────────────────────────────────────
 
-function CampaignFile({file,onSendIdeas,onClose}){
-  const sent=Array.isArray(file.sent)?file.sent:[];
-  const ideas=Array.isArray(file.ideas)?file.ideas:[];
-  const refs=Array.isArray(file.refs)?file.refs:[];
-  const ins=campaignInsights(refs);
-  const[picked,setPicked]=useState([]);
-  const unsent=ideas.map((_,i)=>i).filter(i=>!sent.includes(i));
-  const toggle=i=>setPicked(p=>p.includes(i)?p.filter(x=>x!==i):[...p,i]);
-
-  const stat=(label,value,color)=>(
-    <div style={{flex:"1 1 120px",background:C.light,borderRadius:8,padding:"9px 11px",borderLeft:`3px solid ${color}`}}>
-      <div style={{fontSize:9,color:C.muted,letterSpacing:.6,textTransform:"uppercase",marginBottom:3}}>{label}</div>
-      <div style={{fontSize:13,fontWeight:600,color:C.text,lineHeight:1.3}}>{value}</div>
-    </div>
-  );
-
-  return(
-    <div style={{position:"fixed",inset:0,background:"rgba(15,23,42,.6)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999,fontFamily:"system-ui,sans-serif",padding:16}}>
-      <div style={{background:C.surface,borderRadius:16,border:`1px solid ${C.border}`,boxShadow:"0 24px 80px rgba(0,0,0,.3)",width:"min(760px,100%)",height:"min(760px,94vh)",display:"flex",flexDirection:"column",overflow:"hidden"}}>
-
-        <div style={{display:"flex",height:3,flexShrink:0}}>
-          {[BRAND.red,BRAND.yellow,BRAND.blue,BRAND.green].map((c,i)=><div key={i} style={{flex:1,background:c}}/>)}
-        </div>
-
-        <div style={{padding:"14px 20px",borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"flex-start",gap:12,flexShrink:0,background:"#FAFAFA"}}>
-          <div style={{flex:1,minWidth:0}}>
-            <div style={{fontSize:9,color:C.muted,letterSpacing:1,textTransform:"uppercase",marginBottom:3}}>Campaign file</div>
-            <div style={{fontSize:16,fontWeight:600,color:C.text,letterSpacing:-0.2,lineHeight:1.3}}>{file.title||"Campaign"}</div>
-            <div style={{fontSize:11,color:C.muted,marginTop:3,display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
-              {file.platform&&<span style={{display:"inline-flex",alignItems:"center",gap:4}}><PlatformIcon platform={file.platform}/>{file.platform}</span>}
-              {file.month&&<span>· {monthLabel(file.month)}</span>}
-              <span>· {sent.length} of {ideas.length} in pipeline</span>
-            </div>
-          </div>
-          <button onClick={onClose} style={{background:"none",border:"none",color:C.muted,fontSize:20,cursor:"pointer",padding:"0 4px",flexShrink:0}}>×</button>
-        </div>
-
-        <div style={{flex:1,overflowY:"auto",padding:"16px 20px"}}>
-
-          {file.angle&&(
-            <div style={{marginBottom:16}}>
-              <div style={{fontSize:9,fontWeight:600,color:C.muted,letterSpacing:1,textTransform:"uppercase",marginBottom:7}}>The brief</div>
-              <div style={{fontSize:14,color:C.text,lineHeight:1.6,fontWeight:500,marginBottom:8}}>{file.angle}</div>
-              {file.strategy&&<div style={{fontSize:13,color:C.muted,lineHeight:1.7}}>{file.strategy}</div>}
-            </div>
-          )}
-
-          {ins.count>0&&(
-            <div style={{marginBottom:18}}>
-              <div style={{fontSize:9,fontWeight:600,color:C.muted,letterSpacing:1,textTransform:"uppercase",marginBottom:7}}>What your picks had in common</div>
-              <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-                {ins.hook&&stat("Dominant hook",`${ins.hook.value} · ${ins.hook.count} of ${ins.hook.total}`,BRAND.red)}
-                {ins.format&&stat("Dominant format",`${ins.format.value} · ${ins.format.count} of ${ins.format.total}`,BRAND.yellow)}
-                {ins.medianViews!==null&&stat("Median views",fmt(ins.medianViews),BRAND.blue)}
-                {ins.creators>0&&stat("Distinct creators",`${ins.creators} of ${ins.count}`,BRAND.green)}
-              </div>
-              {file.style&&<div style={{fontSize:12,color:C.muted,lineHeight:1.6,marginTop:9,paddingLeft:10,borderLeft:`2px solid ${C.border}`}}>{file.style}</div>}
-            </div>
-          )}
-
-          {refs.length>0&&(
-            <div style={{marginBottom:18}}>
-              <div style={{fontSize:9,fontWeight:600,color:C.muted,letterSpacing:1,textTransform:"uppercase",marginBottom:7}}>References · {refs.length}</div>
-              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))",gap:8}}>
-                {refs.map((r,i)=>(
-                  <a key={i} href={r.url} target="_blank" rel="noopener noreferrer"
-                     style={{border:`0.5px solid ${C.border}`,borderRadius:8,padding:"9px 10px",textDecoration:"none",background:C.surface,display:"block",transition:"border-color .15s"}}
-                     onMouseEnter={e=>e.currentTarget.style.borderColor=C.accent}
-                     onMouseLeave={e=>e.currentTarget.style.borderColor=C.border}>
-                    <div style={{fontSize:11,fontWeight:600,color:C.text,lineHeight:1.35,marginBottom:4}}>{r.title}</div>
-                    <div style={{fontSize:9,color:C.muted,marginBottom:4}}>{r.creator||""}{r.views?` · ${r.views}`:""}</div>
-                    <div style={{fontSize:9,color:C.accent,fontWeight:600}}>Watch ↗</div>
-                  </a>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div style={{fontSize:9,fontWeight:600,color:C.muted,letterSpacing:1,textTransform:"uppercase",marginBottom:7}}>Ideas · {ideas.length}</div>
-          <div style={{display:"flex",flexDirection:"column",gap:6}}>
-            {ideas.map((idea,i)=>{
-              const isSent=sent.includes(i);
-              const isPicked=picked.includes(i);
-              return(
-                <div key={i} onClick={()=>!isSent&&toggle(i)}
-                  style={{display:"flex",alignItems:"center",gap:10,padding:"9px 11px",borderRadius:8,cursor:isSent?"default":"pointer",background:isSent?"#F6FCF9":isPicked?C.accent+"0C":C.light,border:`1px solid ${isSent?BRAND.green+"40":isPicked?C.accent:C.border}`,transition:"all .15s"}}>
-                  <div style={{width:17,height:17,borderRadius:4,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:"#FFF",background:isSent?BRAND.green:isPicked?C.accent:"transparent",border:`1.5px solid ${isSent?BRAND.green:isPicked?C.accent:C.border}`}}>
-                    {(isSent||isPicked)?"✓":""}
-                  </div>
-                  <div style={{flex:1,fontSize:12,color:C.text,fontWeight:500,lineHeight:1.35}}>{idea.title}</div>
-                  <div style={{display:"flex",gap:4,flexShrink:0,alignItems:"center"}}>
-                    {idea.hook&&<span style={{fontSize:9,padding:"2px 6px",borderRadius:20,background:C.surface,color:C.muted,border:`0.5px solid ${C.border}`}}>{idea.hook}</span>}
-                    {isSent&&<span style={{fontSize:9,padding:"2px 7px",borderRadius:20,background:BRAND.green+"18",color:BRAND.green,fontWeight:600}}>In pipeline</span>}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        <div style={{padding:"11px 20px",borderTop:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,flexShrink:0,background:"#FAFAFA"}}>
-          <div style={{fontSize:11,color:C.muted}}>
-            {unsent.length===0?"Every idea is in your pipeline.":`${unsent.length} idea${unsent.length===1?"":"s"} not sent yet`}
-          </div>
-          <div style={{display:"flex",gap:8,alignItems:"center"}}>
-            {unsent.length>0&&<button onClick={()=>setPicked(picked.length===unsent.length?[]:unsent)}
-              style={{padding:"6px 12px",background:C.surface,border:`0.5px solid ${C.border}`,borderRadius:7,cursor:"pointer",fontSize:12,color:C.muted}}>
-              {picked.length===unsent.length&&unsent.length>0?"Clear":"Select all"}
-            </button>}
-            <button onClick={onClose} style={{padding:"6px 14px",background:C.surface,border:`0.5px solid ${C.border}`,borderRadius:7,cursor:"pointer",fontSize:12,color:C.text}}>Close</button>
-            <button onClick={()=>{if(picked.length)onSendIdeas(picked);}} disabled={picked.length===0}
-              style={{padding:"7px 16px",background:picked.length?C.text:C.border,color:picked.length?"#FFF":C.muted,border:"none",borderRadius:7,cursor:picked.length?"pointer":"not-allowed",fontSize:12,fontWeight:600}}>
-              Send {picked.length||""} to pipeline →
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function CampaignCreator({userId,businessProfile,videos,onSendToPipeline}){
   const[phase,setPhase]=useState("start"); // start|searching|refs|building|result
   const[input,setInput]=useState("");
   const[context,setContext]=useState("");
   const[refs,setRefs]=useState([]);
   const[selected,setSelected]=useState([]);
-  const[campaign,setCampaign]=useState(null);
+  const[ideas,setIdeas]=useState(null);   // {topic, list:[...]} — held for this session only
+  const[recent,setRecent]=useState([]);
   const[loading,setLoading]=useState(false);
-  const[pastCampaigns,setPastCampaigns]=useState([]);
   const[platform,setPlatform]=useState(()=>{
     const counts={};
     (videos||[]).forEach(v=>{if(v.platform)counts[v.platform]=(counts[v.platform]||0)+1;});
@@ -200,16 +79,15 @@ function CampaignCreator({userId,businessProfile,videos,onSendToPipeline}){
   const[bGoal,setBGoal]=useState("Launch");
   const[bAudience,setBAudience]=useState("");
   const bottomRef=useRef(null);
-  const[campaignId,setCampaignId]=useState(null);
   const[picked,setPicked]=useState([]);
-  const[sentIdeas,setSentIdeas]=useState([]);
-  const[fileOpen,setFileOpen]=useState(null);
+  const[sent,setSent]=useState([]);
 
   useEffect(()=>{
-    sbGet("campaigns",`&user_id=eq.${userId}&order=created_at.desc&limit=5`).then(d=>{
+    // Only the search phrase is kept — enough to re-run a direction you liked,
+    // without storing a brief nobody reopens.
+    sbGet("campaigns",`&user_id=eq.${userId}&order=created_at.desc&limit=6`).then(d=>{
       const rows=d||[];
-      setPastCampaigns(rows);
-      // Scaffolding shows for a first campaign, then gets out of the way.
+      setRecent(rows);
       if(rows.length===0)setBuilderOpen(true);
     });
   },[userId]);
@@ -238,7 +116,8 @@ function CampaignCreator({userId,businessProfile,videos,onSendToPipeline}){
     return `${stem}${aud}, on ${platform}.`;
   })();
 
-  const insights=campaignInsights(campaign?.refs||refs.filter((_,i)=>selected.includes(i)));
+  // Computed from the picks, live — nothing stored.
+  const insights=campaignInsights(refs.filter((_,i)=>selected.includes(i)));
 
   const buildSearchSystem=(angle,query)=>`You are a content strategist finding real, existing ${platform} videos to use as references.
 
@@ -461,30 +340,11 @@ ${JSON.stringify(selectedItems,null,2)}`}],
         try{
           const clean=d.content.replace(/```json|```/g,"").trim();
           const parsed=JSON.parse(clean);
-          const cid=uuid();
-          // The campaign file: brief, the picks that produced it, and what's been sent.
-          const file={
-            ...parsed,
-            id:cid,
-            platform,
-            month:curMonth(),
-            refs:selectedItems,
-            sent:[],
-            createdAt:new Date().toISOString(),
-          };
-          setCampaign(file);
-          setCampaignId(cid);
-          setSentIdeas([]);
+          setIdeas({topic:parsed.title||context,list:parsed.ideas||[],angle:parsed.angle||"",strategy:parsed.strategy||"",style:parsed.style||""});
           setPicked([]);
-          await sbInsert("campaigns",{
-            id:cid,user_id:userId,
-            title:parsed.title,
-            brief:JSON.stringify(file),
-            ideas:JSON.stringify(parsed.ideas||[]),
-            month:curMonth(),
-            created_at:new Date().toISOString()
-          });
-          sbGet("campaigns",`&user_id=eq.${userId}&order=created_at.desc&limit=5`).then(dd=>setPastCampaigns(dd||[]));
+          // Log the phrase only, so "recent searches" can re-run it.
+          sbInsert("campaigns",{id:uuid(),user_id:userId,title:(context||"").slice(0,120),brief:"",ideas:"",month:curMonth(),created_at:new Date().toISOString()});
+          sbGet("campaigns",`&user_id=eq.${userId}&order=created_at.desc&limit=6`).then(dd=>setRecent(dd||[]));
           setPhase("result");
         }catch(e){console.error("parse error",e);setPhase("refs");}
       }
@@ -492,63 +352,41 @@ ${JSON.stringify(selectedItems,null,2)}`}],
     setLoading(false);
   };
 
-  // Persist which ideas have gone out, so the file stays truthful when reopened.
-  const markSent=async(file,indices)=>{
-    const merged=Array.from(new Set([...(file.sent||[]),...indices])).sort((a,b)=>a-b);
-    const next={...file,sent:merged};
-    if(file.id)await sbUpdate("campaigns","id",file.id,{brief:JSON.stringify(next)});
-    sbGet("campaigns",`&user_id=eq.${userId}&order=created_at.desc&limit=5`).then(dd=>setPastCampaigns(dd||[]));
-    return next;
-  };
-
-  const pushIdeas=(file,indices)=>{
-    const list=(file.ideas||[]).filter((_,i)=>indices.includes(i));
-    if(!list.length)return;
+  // Ideas live for this session only. Each card carries the phrase that produced
+  // it, so weeks later you can still see where the idea came from.
+  const sendPicked=()=>{
+    if(!ideas||!picked.length)return;
+    const list=ideas.list.filter((_,i)=>picked.includes(i));
     onSendToPipeline(list.map(idea=>({
       id:uuid(),
       title:idea.title,
-      platform:idea.platform||file.platform||"TikTok",
+      platform:idea.platform||platform||"TikTok",
       hook:idea.hook||"",
       format:idea.format||"",
       month:curMonth(),
       stage:"idea",
       targetDate:"",
-      campaignId:file.id||null,
-      campaignTitle:file.title||"",
+      campaignId:null,
+      campaignTitle:(context||"").slice(0,80),
       createdAt:new Date().toISOString()
     })));
-  };
-
-  const sendFromResult=async()=>{
-    if(!campaign||!picked.length)return;
-    pushIdeas(campaign,picked);
-    const next=await markSent({...campaign,id:campaignId||campaign.id,sent:sentIdeas},picked);
-    setSentIdeas(next.sent);
-    setCampaign(c=>({...c,sent:next.sent}));
+    setSent(s=>[...s,...picked]);
     setPicked([]);
   };
 
-  const sendFromFile=async(indices)=>{
-    if(!fileOpen)return;
-    pushIdeas(fileOpen,indices);
-    const next=await markSent(fileOpen,indices);
-    setFileOpen(null);
-  };
-
-  const reset=()=>{setPhase("start");setInput("");setContext("");setRefs([]);setSelected([]);setCampaign(null);setStreaming(false);setBatchDone(0);setDropped(0);setSearchError(null);setSearchCalls(0);setSawProse(false);setNeedInfo(null);};
+  const reset=()=>{setPhase("start");setInput("");setContext("");setRefs([]);setSelected([]);setIdeas(null);setPicked([]);setSent([]);setStreaming(false);setBatchDone(0);setDropped(0);setSearchError(null);setSearchCalls(0);setSawProse(false);setNeedInfo(null);};
 
   // ── START SCREEN ───────────────────────────────────────────────────────────
   if(phase==="start")return(
     <div>
-      {fileOpen&&<CampaignFile file={fileOpen} onSendIdeas={sendFromFile} onClose={()=>setFileOpen(null)}/>}
       <Card pad={0} style={{marginBottom:16,overflow:"hidden"}}>
         <div style={{display:"flex",height:3}}>
           {[BRAND.red,BRAND.yellow,BRAND.blue,BRAND.green].map((c,i)=><div key={i} style={{flex:1,background:c}}/>)}
         </div>
         <div style={{padding:"18px 20px 20px"}}>
-          <div style={{fontSize:9,fontWeight:600,color:C.muted,letterSpacing:1,textTransform:"uppercase",marginBottom:5}}>New campaign</div>
-          <div style={{fontSize:17,fontWeight:600,color:C.text,letterSpacing:-0.2,marginBottom:4}}>What are you creating this month?</div>
-          <div style={{fontSize:12,color:C.muted,lineHeight:1.55,marginBottom:18}}>Pick a platform, describe the campaign, and Sidekick finds real videos you can open.</div>
+          <div style={{fontSize:9,fontWeight:600,color:C.muted,letterSpacing:1,textTransform:"uppercase",marginBottom:5}}>Brainstorm</div>
+          <div style={{fontSize:17,fontWeight:600,color:C.text,letterSpacing:-0.2,marginBottom:4}}>What do you want to make?</div>
+          <div style={{fontSize:12,color:C.muted,lineHeight:1.55,marginBottom:18}}>Pick a platform, say what you're making, and Sidekick finds real videos you can open.</div>
 
           <div style={{fontSize:9,fontWeight:600,color:C.muted,letterSpacing:1,textTransform:"uppercase",marginBottom:7}}>Find references on</div>
           <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:18}}>
@@ -630,7 +468,7 @@ ${JSON.stringify(selectedItems,null,2)}`}],
               value={input}
               onChange={e=>setInput(e.target.value)}
               onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey&&input.trim()){e.preventDefault();searchRefs(input.trim());}}}
-              placeholder="Describe the campaign — what you're launching, who it's for, what it should do."
+              placeholder="What you're making, who it's for, and what it should do."
               style={{...inp,borderRadius:10,padding:"11px 48px 11px 14px",fontSize:13,lineHeight:1.5,resize:"none",height:46,fontFamily:"system-ui"}}
             />
             <button
@@ -657,32 +495,23 @@ ${JSON.stringify(selectedItems,null,2)}`}],
         </div>
       </Card>
 
-      {pastCampaigns.length>0&&(
+      {recent.length>0&&(
         <div>
-          <div style={{fontSize:9,fontWeight:600,color:C.muted,letterSpacing:1,textTransform:"uppercase",marginBottom:8}}>Recent campaigns</div>
+          <div style={{fontSize:9,fontWeight:600,color:C.muted,letterSpacing:1,textTransform:"uppercase",marginBottom:8}}>Recent searches</div>
           <div style={{display:"flex",flexDirection:"column",gap:6}}>
-            {pastCampaigns.map((c,i)=>{
-              let file={};try{file=JSON.parse(c.brief||"{}");}catch(e){}
-              const total=(file.ideas||[]).length;
-              const done=(file.sent||[]).length;
-              return(
-                <div key={c.id} onClick={()=>setFileOpen({...file,id:file.id||c.id,title:file.title||c.title,month:file.month||c.month})}
-                  style={{display:"flex",alignItems:"center",gap:11,padding:"10px 12px",background:C.surface,border:`1px solid ${C.border}`,borderRadius:10,cursor:"pointer",transition:"border-color .15s"}}
-                  onMouseEnter={e=>e.currentTarget.style.borderColor=C.accent}
-                  onMouseLeave={e=>e.currentTarget.style.borderColor=C.border}>
-                  <div style={{width:4,height:30,borderRadius:2,background:[BRAND.red,BRAND.blue,BRAND.green,BRAND.yellow,C.purple][i%5],flexShrink:0}}/>
-                  <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontSize:12,fontWeight:600,color:C.text}}>{c.title||"Campaign"}</div>
-                    <div style={{fontSize:10,color:C.muted,marginTop:1}}>
-                      {file.month?monthLabel(file.month):c.month}
-                      {total>0&&` · ${done} of ${total} in pipeline`}
-                      {file.platform&&` · ${file.platform}`}
-                    </div>
-                  </div>
-                  <span style={{fontSize:11,color:C.muted}}>→</span>
+            {recent.filter(c=>(c.title||"").trim()).map((c,i)=>(
+              <div key={c.id} onClick={()=>{setInput(c.title);searchRefs(c.title);}}
+                style={{display:"flex",alignItems:"center",gap:11,padding:"10px 12px",background:C.surface,border:`1px solid ${C.border}`,borderRadius:10,cursor:"pointer",transition:"border-color .15s"}}
+                onMouseEnter={e=>e.currentTarget.style.borderColor=C.accent}
+                onMouseLeave={e=>e.currentTarget.style.borderColor=C.border}>
+                <div style={{width:4,height:26,borderRadius:2,background:[BRAND.red,BRAND.blue,BRAND.green,BRAND.yellow,C.purple][i%5],flexShrink:0}}/>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:12,color:C.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.title}</div>
+                  <div style={{fontSize:10,color:C.muted,marginTop:1}}>{c.month?monthLabel(c.month):""}</div>
                 </div>
-              );
-            })}
+                <span style={{fontSize:10,color:C.muted,flexShrink:0}}>Search again →</span>
+              </div>
+            ))}
           </div>
         </div>
       )}
@@ -814,7 +643,7 @@ ${JSON.stringify(selectedItems,null,2)}`}],
   if(phase==="building")return(
     <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:500,padding:40,textAlign:"center"}}>
       <div style={{fontSize:32,marginBottom:20}}>✨</div>
-      <div style={{fontSize:18,fontWeight:700,color:C.text,marginBottom:8}}>Building your campaign...</div>
+      <div style={{fontSize:18,fontWeight:700,color:C.text,marginBottom:8}}>Turning your picks into titles…</div>
       <div style={{fontSize:13,color:C.muted,maxWidth:400,lineHeight:1.6}}>Reading your selections, identifying the pattern, and creating a campaign tailored to your brand's aesthetic.</div>
       <div style={{marginTop:24,display:"flex",gap:5,alignItems:"flex-end"}}>
         {[[BRAND.red,18,10],[BRAND.yellow,11,7],[BRAND.blue,14,8],[BRAND.green,9,12]].map(([c,h,w],i)=>(
@@ -825,7 +654,7 @@ ${JSON.stringify(selectedItems,null,2)}`}],
   );
 
   // ── CAMPAIGN RESULT ────────────────────────────────────────────────────────
-  if(phase==="result"&&campaign)return(
+  if(phase==="result"&&ideas)return(
     <div>
       <Card pad={0} style={{marginBottom:16,overflow:"hidden"}}>
         <div style={{display:"flex",height:3}}>
@@ -834,13 +663,13 @@ ${JSON.stringify(selectedItems,null,2)}`}],
         <div style={{padding:"16px 20px 18px"}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12,marginBottom:12}}>
             <div style={{minWidth:0}}>
-              <div style={{fontSize:9,fontWeight:600,color:C.muted,letterSpacing:1,textTransform:"uppercase",marginBottom:4}}>Campaign file</div>
-              <div style={{fontSize:17,fontWeight:600,color:C.text,letterSpacing:-0.2,lineHeight:1.3}}>{campaign.title}</div>
-              <div style={{fontSize:13,color:C.muted,marginTop:4,lineHeight:1.55}}>{campaign.angle}</div>
+              <div style={{fontSize:9,fontWeight:600,color:C.muted,letterSpacing:1,textTransform:"uppercase",marginBottom:4}}>Ideas from your picks</div>
+              <div style={{fontSize:17,fontWeight:600,color:C.text,letterSpacing:-0.2,lineHeight:1.3}}>{ideas.topic}</div>
+              {ideas.angle&&<div style={{fontSize:13,color:C.muted,marginTop:4,lineHeight:1.55}}>{ideas.angle}</div>}
             </div>
-            <button onClick={reset} style={{padding:"6px 12px",border:`0.5px solid ${C.border}`,borderRadius:7,background:C.surface,cursor:"pointer",fontSize:12,color:C.muted,flexShrink:0}}>New campaign</button>
+            <button onClick={reset} style={{padding:"6px 12px",border:`0.5px solid ${C.border}`,borderRadius:7,background:C.surface,cursor:"pointer",fontSize:12,color:C.muted,flexShrink:0}}>New search</button>
           </div>
-          {campaign.strategy&&<div style={{fontSize:13,color:C.text,lineHeight:1.7}}>{campaign.strategy}</div>}
+          {ideas.strategy&&<div style={{fontSize:13,color:C.text,lineHeight:1.7}}>{ideas.strategy}</div>}
         </div>
       </Card>
 
@@ -850,7 +679,7 @@ ${JSON.stringify(selectedItems,null,2)}`}],
           <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
             {[[insights.hook&&`${insights.hook.value} · ${insights.hook.count} of ${insights.hook.total}`,"Dominant hook",BRAND.red],
               [insights.format&&`${insights.format.value} · ${insights.format.count} of ${insights.format.total}`,"Dominant format",BRAND.yellow],
-              [insights.medianViews!==null&&fmt(insights.medianViews),"Median views",BRAND.blue],
+              [insights.medianViews!==null&&fmt(insights.medianViews),"Typical views",BRAND.blue],
               [insights.creators>0&&`${insights.creators} of ${insights.count}`,"Distinct creators",BRAND.green]].map(([val,label,color])=>val?(
                 <div key={label} style={{flex:"1 1 130px",background:C.light,borderRadius:8,padding:"9px 11px",borderLeft:`3px solid ${color}`}}>
                   <div style={{fontSize:9,color:C.muted,letterSpacing:.6,textTransform:"uppercase",marginBottom:3}}>{label}</div>
@@ -858,24 +687,24 @@ ${JSON.stringify(selectedItems,null,2)}`}],
                 </div>
               ):null)}
           </div>
-          {campaign.style&&<div style={{fontSize:12,color:C.muted,lineHeight:1.6,marginTop:10,paddingLeft:10,borderLeft:`2px solid ${C.border}`}}>{campaign.style}</div>}
+          {ideas.style&&<div style={{fontSize:12,color:C.muted,lineHeight:1.6,marginTop:10,paddingLeft:10,borderLeft:`2px solid ${C.border}`}}>{ideas.style}</div>}
         </Card>
       )}
 
       <Card style={{marginBottom:16}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12,gap:10,flexWrap:"wrap"}}>
-          <div style={{fontSize:9,fontWeight:600,color:C.muted,letterSpacing:1,textTransform:"uppercase"}}>{(campaign.ideas||[]).length} video ideas</div>
+          <div style={{fontSize:9,fontWeight:600,color:C.muted,letterSpacing:1,textTransform:"uppercase"}}>{ideas.list.length} titles</div>
           <div style={{display:"flex",gap:8,alignItems:"center"}}>
             <span style={{fontSize:11,color:C.muted}}>Pick the ones you want to make</span>
-            <button onClick={()=>{const avail=(campaign.ideas||[]).map((_,i)=>i).filter(i=>!sentIdeas.includes(i));setPicked(picked.length===avail.length?[]:avail);}}
+            <button onClick={()=>{const avail=ideas.list.map((_,i)=>i).filter(i=>!sent.includes(i));setPicked(picked.length===avail.length?[]:avail);}}
               style={{padding:"4px 10px",background:C.surface,border:`0.5px solid ${C.border}`,borderRadius:20,cursor:"pointer",fontSize:11,color:C.muted}}>
-              {picked.length&&picked.length===(campaign.ideas||[]).filter((_,i)=>!sentIdeas.includes(i)).length?"Clear":"Select all"}
+              {picked.length&&picked.length===ideas.list.filter((_,i)=>!sent.includes(i)).length?"Clear":"Select all"}
             </button>
           </div>
         </div>
         <div style={{display:"flex",flexDirection:"column",gap:6}}>
-          {(campaign.ideas||[]).map((idea,i)=>{
-            const isSent=sentIdeas.includes(i);
+          {ideas.list.map((idea,i)=>{
+            const isSent=sent.includes(i);
             const isPicked=picked.includes(i);
             return(
               <div key={i} onClick={()=>{if(isSent)return;setPicked(p=>p.includes(i)?p.filter(x=>x!==i):[...p,i]);}}
@@ -887,7 +716,7 @@ ${JSON.stringify(selectedItems,null,2)}`}],
                 <div style={{display:"flex",gap:4,flexShrink:0,alignItems:"center"}}>
                   {idea.hook&&<span style={{fontSize:9,padding:"2px 6px",borderRadius:20,background:C.surface,color:C.muted,border:`0.5px solid ${C.border}`}}>{idea.hook}</span>}
                   {idea.format&&<span style={{fontSize:9,padding:"2px 6px",borderRadius:20,background:C.surface,color:C.muted,border:`0.5px solid ${C.border}`}}>{idea.format}</span>}
-                  {isSent&&<span style={{fontSize:9,padding:"2px 7px",borderRadius:20,background:BRAND.green+"18",color:BRAND.green,fontWeight:600}}>In pipeline</span>}
+                  {isSent&&<span style={{fontSize:9,padding:"2px 7px",borderRadius:20,background:BRAND.green+"18",color:BRAND.green,fontWeight:600}}>Sent</span>}
                 </div>
               </div>
             );
@@ -896,15 +725,15 @@ ${JSON.stringify(selectedItems,null,2)}`}],
       </Card>
 
       <button
-        onClick={sendFromResult}
+        onClick={sendPicked}
         disabled={picked.length===0}
         style={{width:"100%",padding:"13px 0",background:picked.length?C.text:C.border,color:picked.length?"#FFF":C.muted,border:"none",borderRadius:10,fontSize:14,fontWeight:600,cursor:picked.length?"pointer":"not-allowed"}}>
-        {picked.length?`Send ${picked.length} idea${picked.length===1?"":"s"} to my pipeline →`:"Select ideas to send"}
+        {picked.length?`Send ${picked.length} to my pipeline →`:"Select titles to send"}
       </button>
       <div style={{textAlign:"center",fontSize:11,color:C.muted,marginTop:8}}>
-        {sentIdeas.length>0
-          ?`${sentIdeas.length} already in your pipeline. The rest stay here — reopen this campaign any time.`
-          :"Whatever you don't send stays in this campaign file for later."}
+        {sent.length>0
+          ?`${sent.length} sent. Anything you don't send disappears when you leave — the search takes seconds to run again.`
+          :"Each card remembers the search that produced it."}
       </div>
     </div>
   );
@@ -914,4 +743,4 @@ ${JSON.stringify(selectedItems,null,2)}`}],
 
 // ── CREATOR DASHBOARD ─────────────────────────────────────────────────────────
 
-export { CampaignCreator, CampaignFile, campaignInsights, parseViews, topOf, verifyRef };
+export { CampaignCreator, campaignInsights, parseViews, topOf, verifyRef };
