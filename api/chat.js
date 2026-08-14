@@ -1,22 +1,26 @@
+// Node serverless runtime, NOT edge.
+// Edge functions must start responding within ~25s, and a single Anthropic
+// web-search call regularly needs longer than that — every call was being
+// killed at the ceiling. Node functions allow a much longer duration.
 export const config = {
-  runtime: 'edge',
   maxDuration: 60,
 };
 
-export default async function handler(req) {
+export default async function handler(req, res) {
   if (req.method !== 'POST') {
-    return new Response('Method not allowed', { status: 405 });
+    return res.status(405).json({ error: 'Method not allowed' });
   }
 
   const started = Date.now();
+
   try {
-    const {
-      messages,
-      systemPrompt,
-      useWebSearch,
-      allowedDomains,
-      maxUses,
-    } = await req.json();
+    // The Node runtime parses JSON bodies for us, but be tolerant either way.
+    const payload = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {});
+    const { messages, systemPrompt, useWebSearch, allowedDomains, maxUses } = payload;
+
+    if (!Array.isArray(messages) || !messages.length) {
+      return res.status(400).json({ error: 'messages is required' });
+    }
 
     const body = {
       model: 'claude-sonnet-4-6',
@@ -29,7 +33,7 @@ export default async function handler(req) {
       const tool = {
         type: 'web_search_20250305',
         name: 'web_search',
-        max_uses: maxUses || 2,
+        max_uses: maxUses || 3,
       };
       // Pinning the domain is what makes results usable: without it the search
       // returns articles *about* videos, which carry no on-platform URL.
@@ -39,36 +43,46 @@ export default async function handler(req) {
       body.tools = [tool];
     }
 
+    // Stop ourselves before the platform does, so the client always gets JSON
+    // instead of Vercel's plain-text error page.
     const controller = new AbortController();
-    // Must fire BEFORE the platform's own limit, otherwise Vercel kills the
-    // function and returns a plain-text error page instead of our JSON.
-    const budget = useWebSearch ? 22000 : 15000;
+    const budget = useWebSearch ? 50000 : 20000;
     const timeout = setTimeout(() => controller.abort(), budget);
 
-    // No anthropic-beta header — web_search_20250305 is generally available.
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      signal: controller.signal,
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': process.env.ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify(body),
-    });
+    let response;
+    try {
+      response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        signal: controller.signal,
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': process.env.ANTHROPIC_API_KEY,
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify(body),
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
 
-    clearTimeout(timeout);
-
-    const data = await response.json();
+    const raw = await response.text();
+    let data;
+    try {
+      data = JSON.parse(raw);
+    } catch (e) {
+      return res.status(502).json({
+        error: `Upstream returned non-JSON (${response.status})`,
+        ms: Date.now() - started,
+      });
+    }
 
     if (!response.ok) {
-      const detail =
-        (data && data.error && data.error.message) ||
-        (typeof data === 'string' ? data : JSON.stringify(data));
-      return new Response(
-        JSON.stringify({ error: detail, status: response.status }),
-        { status: response.status, headers: { 'Content-Type': 'application/json' } }
-      );
+      const detail = (data && data.error && data.error.message) || JSON.stringify(data);
+      return res.status(response.status).json({
+        error: String(detail).slice(0, 300),
+        status: response.status,
+        ms: Date.now() - started,
+      });
     }
 
     const blocks = Array.isArray(data.content) ? data.content : [];
@@ -77,29 +91,22 @@ export default async function handler(req) {
       .map(b => b.text)
       .join('\n');
 
-    // Surfaced so the client can tell "search ran and found nothing" apart
-    // from "search never ran".
+    // Lets the client tell "searched and found nothing" apart from "never searched".
     const searchCalls = blocks.filter(b => b.type === 'server_tool_use').length;
 
-    return new Response(
-      JSON.stringify({
-        content: text,
-        searchCalls,
-        ms: Date.now() - started,
-        stopReason: data.stop_reason || null,
-      }),
-      { headers: { 'Content-Type': 'application/json' } }
-    );
+    return res.status(200).json({
+      content: text,
+      searchCalls,
+      ms: Date.now() - started,
+      stopReason: data.stop_reason || null,
+    });
 
   } catch (err) {
     const isTimeout = err.name === 'AbortError';
-    return new Response(JSON.stringify({
-      error: isTimeout ? `Timed out after ${Date.now()-started}ms` : err.message,
+    return res.status(isTimeout ? 504 : 500).json({
+      error: isTimeout ? `Timed out after ${Date.now() - started}ms` : (err.message || 'Unknown error'),
       timeout: isTimeout,
       ms: Date.now() - started,
-    }), {
-      status: isTimeout ? 504 : 500,
-      headers: { 'Content-Type': 'application/json' },
     });
   }
 }
