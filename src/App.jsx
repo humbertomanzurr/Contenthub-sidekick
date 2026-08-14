@@ -52,4 +52,20 @@ export default function App(){
     try{localStorage.setItem(`sk_acct_${u.id}`,acct);}catch(e){}
     setUser(u);setProfile(p);setState(acct);
   };
-  const logout=()=>{sbSignOut();setUser(null);se
+  const logout=()=>{sbSignOut();setUser(null);setProfile(null);setState("landing");};
+  const pick=path=>{
+    if(path==="login"){setAuthPath(null);setState("auth");}
+    else{setAuthPath(path);setState("auth");}
+  };
+
+  if(state==="loading")return(
+    <div style={{minHeight:"100vh",background:C.bg,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"system-ui,sans-serif",color:C.muted,fontSize:13}}>
+      Loading…
+    </div>
+  );
+  if(state==="landing")return<Landing onPath={pick}/>;
+  if(state==="auth")return<AuthScreen path={authPath||"creator"} onLogin={login} onBack={()=>setState("landing")}/>;
+  if(state==="creator")return<CreatorApp user={user} profile={profile} onLogout={logout}/>;
+  if(state==="agency")return<AgencyApp user={user} profile={profile} onLogout={logout}/>;
+  return null;
+}
