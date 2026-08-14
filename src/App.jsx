@@ -18,9 +18,6 @@ export default function App(){
         if(s?.user){
           const p=await sbGetOne("profiles","id",s.user.id);
           const cached=localStorage.getItem(`sk_acct_${s.user.id}`);
-          // The profiles row is the source of truth, but a failed read must not
-          // silently demote an agency user to Business. Fall back to what we
-          // recorded at sign-in, and repair the row when it's missing.
           // cached is written the moment the user picks a portal, so when the two
           // disagree the row is almost certainly a trigger default — repair it.
           if(p&&cached&&p.account_type!==cached){
@@ -50,23 +47,9 @@ export default function App(){
     })();
   },[]);
 
-  useEffect(()=>{const iv=setInterval(async()=>{const s=localStorage.getItem("sk_auth");if(s)await sbGetSession();},10*60*1000);return()=>clearInterval(iv);},[]);
-
   const login=(u,p)=>{
     const acct=p?.account_type||"creator";
     try{localStorage.setItem(`sk_acct_${u.id}`,acct);}catch(e){}
     setUser(u);setProfile(p);setState(acct);
   };
-  const logout=()=>{sbSignOut();setUser(null);setProfile(null);setState("landing");};
-  const pick=path=>{if(path==="login"){setAuthPath(null);setState("auth");}else{setAuthPath(path);setState("auth");}};
-
-  if(state==="loading")return(<div style={{minHeight:"100vh",background:C.bg,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"system-ui"}}><div style={{textAlign:"center"}}><div style={{fontSize:20,fontWeight:900,color:C.text}}>ContentHub Sidekick</div><div style={{fontSize:12,color:C.muted,marginTop:5}}>Loading...</div></div></div>);
-  if(state==="landing")return<Landing onPath={pick}/>;
-  if(state==="auth")return<AuthScreen path={authPath||"creator"} onLogin={login} onBack={()=>setState("landing")}/>;
-  if(state==="creator")return<CreatorApp user={user} profile={profile} onLogout={logout}/>;
-
-    if(state==="agency")return<AgencyApp user={user} profile={profile} onLogout={logout}/>;
-  return null;
-}
-
-export default App;
+  const logout=()=>{sbSignOut();setUser(null);se
