@@ -70,7 +70,7 @@ const pctOf=(n,d)=>d>0?Math.round(n/d*100):null;
 // aren't landing, and it burns editor hours invisibly.
 
 const reworkRate=vids=>{
-  const reached=vids.filter(v=>v.revision||["review","published"].includes(v.stage));
+  const reached=vids.filter(v=>v.revision||["review","approved","published"].includes(v.stage));
   if(!reached.length)return{pct:null,n:0,total:0};
   const redone=reached.filter(v=>v.revision).length;
   return{pct:pctOf(redone,reached.length),n:redone,total:reached.length};
@@ -99,7 +99,8 @@ const onTimeRate=vids=>{
 // Stuck: cards sitting too long in one stage. Catches a jam before it becomes
 // a missed deadline. Falls back to createdAt until stage_changed_at is populated.
 
-const STUCK_DAYS={idea:10,production:7,editing:7,review:3};
+// Approved work waiting to go out is normal for a while — but not forever.
+const STUCK_DAYS={idea:10,production:7,editing:7,review:3,approved:14};
 
 const stuckCards=vids=>vids
   .filter(v=>v.stage!=="published")
