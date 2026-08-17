@@ -178,13 +178,42 @@ function ClientProfileSetup({client,onComplete,onSkip}){
 
 // ── AGENCY DASHBOARD ──────────────────────────────────────────────────────────
 
-function AgencyDashboard({clientError,clients,videos,targets,month,onMonthChange,onSelectClient,onAddClient,onSetTarget,businessProfile}){
+function AgencyDashboard({clientError,clients,videos,targets,month,onMonthChange,onSelectClient,onAddClient,onSetTarget,onReschedule,businessProfile}){
   const[showAddClient,setShowAddClient]=useState(false);
   const[newName,setNewName]=useState("");
   const[adding,setAdding]=useState(false);
   const[newEmoji,setNewEmoji]=useState("🏢");
   const[showEmoji,setShowEmoji]=useState(false);
   const[pendingProfileClient,setPendingProfileClient]=useState(null);
+  const[trayOpen,setTrayOpen]=useState(false);
+  const[dayOpen,setDayOpen]=useState(null);
+  // Colours identify clients across the whole calendar.
+  const CLIENT_COLORS=[BRAND.blue,BRAND.green,BRAND.red,BRAND.yellow,C.purple,"#F97316","#0EA5E9","#DB2777"];
+  const colorOf=id=>CLIENT_COLORS[Math.max(0,clients.findIndex(c=>c.id===id))%CLIENT_COLORS.length];
+
+  const mVids=videos.filter(v=>v.month===month);
+  const scheduled=mVids.filter(v=>v.targetDate);
+  const unscheduled=mVids.filter(v=>!v.targetDate&&v.stage!=="published");
+  const byDay={};
+  scheduled.forEach(v=>{(byDay[v.targetDate]=byDay[v.targetDate]||[]).push(v);});
+
+  // Month grid, Monday-first, padded to whole weeks.
+  const[y,mo]=month.split("-").map(Number);
+  const first=new Date(y,mo-1,1);
+  const daysInMonth=new Date(y,mo,0).getDate();
+  const lead=(first.getDay()+6)%7;
+  const cells=[];
+  for(let i=0;i<lead;i++)cells.push(null);
+  for(let d=1;d<=daysInMonth;d++)cells.push(`${month}-${String(d).padStart(2,"0")}`);
+  while(cells.length%7)cells.push(null);
+  const todayISO=new Date().toISOString().slice(0,10);
+
+  const onDrop=(e,date)=>{
+    e.preventDefault();
+    e.currentTarget.style.background=C.light;
+    const id=e.dataTransfer.getData("videoId");
+    if(id&&date)onReschedule(id,date);
+  };
   const EMOJIS=["🏢","🍕","💪","✂️","🛍️","🍔","☕","🏠","💄","🎵","🐾","🌿","👗","🚗","📚","🎮","🏋️","🍜","🌮","🏪"];
 
   const addClient=async()=>{
@@ -201,9 +230,6 @@ function AgencyDashboard({clientError,clients,videos,targets,month,onMonthChange
     setAdding(false);
   };
 
-  const totalGoal=clients.reduce((s,c)=>{const t=targets.find(t=>t.client_id===c.id&&t.month===month);return s+(t?.goal||0);},0);
-  const totalPub=clients.reduce((s,c)=>s+videos.filter(v=>v.client_id===c.id&&v.month===month&&v.stage==="published").length,0);
-  const pct=totalGoal>0?Math.min(100,Math.round(totalPub/totalGoal*100)):0;
 
   return(
     <div>
@@ -214,28 +240,41 @@ function AgencyDashboard({clientError,clients,videos,targets,month,onMonthChange
         </div>
       )}
       {/* Month nav */}
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,flexWrap:"wrap",gap:10}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14,flexWrap:"wrap",gap:10}}>
         <div style={{display:"flex",alignItems:"center",gap:7}}>
-          <button onClick={()=>onMonthChange(addMonths(month,-1))} style={{width:30,height:30,border:`1px solid ${C.border}`,borderRadius:7,background:C.surface,cursor:"pointer",fontSize:13}}>←</button>
+          <button onClick={()=>onMonthChange(addMonths(month,-1))} style={{width:30,height:30,border:`1px solid ${C.border}`,borderRadius:7,background:C.surface,cursor:"pointer",fontSize:13,color:C.text}}>←</button>
           <div style={{fontSize:15,fontWeight:700,color:C.text,minWidth:125,textAlign:"center"}}>{monthLabel(month)}</div>
-          <button onClick={()=>onMonthChange(addMonths(month,1))} style={{width:30,height:30,border:`1px solid ${C.border}`,borderRadius:7,background:C.surface,cursor:"pointer",fontSize:13}}>→</button>
+          <button onClick={()=>onMonthChange(addMonths(month,1))} style={{width:30,height:30,border:`1px solid ${C.border}`,borderRadius:7,background:C.surface,cursor:"pointer",fontSize:13,color:C.text}}>→</button>
+          {month!==curMonth()&&<button onClick={()=>onMonthChange(curMonth())} style={{padding:"5px 10px",border:`1px solid ${C.border}`,borderRadius:7,background:C.light,cursor:"pointer",fontSize:11,color:C.muted}}>This month</button>}
         </div>
         <Btn primary onClick={()=>setShowAddClient(true)}>+ Add client</Btn>
       </div>
-
-      {/* Agency progress bar */}
-      <Card style={{marginBottom:16}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end",marginBottom:8}}>
-          <div>
-            <div style={{fontSize:10,color:C.muted,letterSpacing:1,fontWeight:600,marginBottom:3}}>AGENCY PROGRESS — {monthLabel(month)}</div>
-            <div style={{fontSize:20,fontWeight:800,color:pct===100?C.green:C.accent}}>{totalGoal===0?"Set targets per client to track progress":pct===100?"🎉 All targets hit!":pct+"%  complete across all clients"}</div>
+      {/* Client legend — colour key, progress, and a way into each pipeline */}
+      {clients.length>0&&(
+        <Card pad={0} style={{marginBottom:14,overflow:"hidden"}}>
+          <div style={{display:"flex",height:3}}>
+            {[BRAND.red,BRAND.yellow,BRAND.blue,BRAND.green].map((c,i)=><div key={i} style={{flex:1,background:c}}/>)}
           </div>
-          {totalGoal>0&&<div style={{textAlign:"right"}}><div style={{fontSize:26,fontWeight:900,color:C.text}}>{totalPub}<span style={{fontSize:14,color:C.muted}}>/{totalGoal}</span></div><div style={{fontSize:11,color:C.muted}}>videos published</div></div>}
-        </div>
-        {totalGoal>0&&<><div style={{background:C.light,borderRadius:20,height:9,overflow:"hidden",marginBottom:6}}><div style={{width:`${pct}%`,height:"100%",background:pct===100?BRAND.green:`linear-gradient(90deg,${BRAND.red},${BRAND.blue})`,borderRadius:20,transition:"width .4s"}}/></div><div style={{fontSize:11,color:C.muted}}>{clients.length} clients · {totalGoal-totalPub} videos remaining</div></>}
-      </Card>
+          <div style={{padding:"13px 16px",display:"flex",gap:16,flexWrap:"wrap",alignItems:"center"}}>
+            {clients.map(client=>{
+              const cv=mVids.filter(v=>v.clientId===client.id);
+              const target=targets.find(t=>t.client_id===client.id&&t.month===month);
+              const goal=target?.goal||0;
+              const pub=cv.filter(v=>v.stage==="published").length;
+              const behind=goal>0&&pub/goal<0.5;
+              return(
+                <div key={client.id} onClick={()=>onSelectClient(client)}
+                  style={{display:"flex",alignItems:"center",gap:7,cursor:"pointer"}}>
+                  <span style={{width:10,height:10,borderRadius:3,background:colorOf(client.id),flexShrink:0}}/>
+                  <span style={{fontSize:12,color:C.text}}>{client.name}</span>
+                  <span style={{fontSize:11,color:behind?C.red:C.muted}}>{goal>0?`${pub} / ${goal}`:`${cv.length}`}</span>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      )}
 
-      {/* Client grid */}
       {clients.length===0?(
         <Card style={{textAlign:"center",padding:48}}>
           <div style={{fontSize:36,marginBottom:10}}>🏛️</div>
@@ -244,55 +283,117 @@ function AgencyDashboard({clientError,clients,videos,targets,month,onMonthChange
           <Btn primary onClick={()=>setShowAddClient(true)}>+ Add your first client</Btn>
         </Card>
       ):(
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))",gap:13}}>
-          {clients.map(client=>{
-            const cVids=videos.filter(v=>v.client_id===client.id&&v.month===month);
-            const target=targets.find(t=>t.client_id===client.id&&t.month===month);
-            const goal=target?.goal||0;
-            const pub=cVids.filter(v=>v.stage==="published").length;
-            const cpct=goal>0?Math.min(100,Math.round(pub/goal*100)):null;
-            const health=cpct===null?"gray":cpct>=80?C.green:cpct>=40?C.amber:C.red;
-            return(
-              <div key={client.id} onClick={()=>onSelectClient(client)} style={{background:C.surface,borderRadius:12,border:`1px solid ${C.border}`,boxShadow:sh,padding:18,cursor:"pointer",transition:"box-shadow .15s,transform .15s"}}
-                onMouseEnter={e=>{e.currentTarget.style.boxShadow="0 6px 20px rgba(0,0,0,.1)";e.currentTarget.style.transform="translateY(-1px)";}}
-                onMouseLeave={e=>{e.currentTarget.style.boxShadow=sh;e.currentTarget.style.transform="none";}}>
-                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
-                  <div style={{display:"flex",alignItems:"center",gap:10}}>
-                    <div style={{width:38,height:38,borderRadius:10,background:C.light,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>{client.emoji||"🏢"}</div>
-                    <div style={{fontSize:14,fontWeight:700,color:C.text}}>{client.name}</div>
-                  </div>
-                  <div style={{width:10,height:10,borderRadius:"50%",background:health}}/>
-                </div>
-                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:7}}>
-                  <div style={{fontSize:9,color:C.muted,letterSpacing:.6,textTransform:"uppercase"}}>Where the work is</div>
-                  <div style={{fontSize:9,color:C.muted}}>{cVids.length} this month</div>
-                </div>
-                <div style={{display:"flex",gap:5,marginBottom:10,paddingBottom:10,borderBottom:`0.5px solid ${C.border}`}}>
-                  {AGENCY_STAGES.map(st=>{
-                    const n=cVids.filter(v=>v.stage===st.id).length;
-                    const rev=st.id==="editing"?cVids.filter(v=>v.stage==="editing"&&v.revision).length:0;
-                    return(
-                      <div key={st.id} title={st.label} style={{flex:1,minWidth:0,background:n>0?st.color+"12":C.light,border:`1px solid ${n>0?st.color+"40":C.border}`,borderRadius:7,padding:"6px 4px",textAlign:"center",position:"relative"}}>
-                        <div style={{fontSize:16,fontWeight:700,color:n>0?st.color:C.muted,lineHeight:1.15}}>{n}</div>
-                        <div style={{fontSize:8,color:C.muted,letterSpacing:.2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{st.label==="Ready for Review"?"Review":st.label}</div>
-                        {rev>0&&<div style={{position:"absolute",top:-5,right:-3,background:"#EA580C",color:"#FFF",fontSize:8,fontWeight:700,borderRadius:20,padding:"0 5px",lineHeight:"13px"}}>{rev}</div>}
-                      </div>
-                    );
-                  })}
-                </div>
-                {goal>0?(
-                  <>
-                    <div style={{background:C.light,borderRadius:20,height:6,overflow:"hidden",marginBottom:7}}><div style={{width:`${cpct}%`,height:"100%",background:health,borderRadius:20,transition:"width .3s"}}/></div>
-                    <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:C.muted}}>
-                      <span>{pub}/{goal} published this month</span>
+        <>
+          <Card pad={10} style={{marginBottom:12}}>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:4,marginBottom:4}}>
+              {["MON","TUE","WED","THU","FRI","SAT","SUN"].map(d=>(
+                <div key={d} style={{fontSize:9,color:C.muted,textAlign:"center",letterSpacing:.5}}>{d}</div>
+              ))}
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:4}}>
+              {cells.map((date,i)=>{
+                if(!date)return <div key={i} style={{minHeight:78}}/>;
+                const list=byDay[date]||[];
+                const dayNum=Number(date.slice(-2));
+                const isToday=date===todayISO;
+                const isPast=date<todayISO;
+                const weekend=[5,6].includes((i)%7);
+                // Density ladder: full titles when there's room, compact rows when
+                // there isn't, and a colour stack once it's beyond reading.
+                const mode=list.length<=2?"full":list.length<=5?"compact":"stack";
+                return(
+                  <div key={date}
+                    onDragOver={e=>{e.preventDefault();e.currentTarget.style.background=C.accent+"10";}}
+                    onDragLeave={e=>{e.currentTarget.style.background=C.light;}}
+                    onDrop={e=>onDrop(e,date)}
+                    style={{background:C.light,borderRadius:7,padding:5,minHeight:78,border:isToday?`1px solid ${C.accent}`:"1px solid transparent",opacity:weekend&&!list.length?.55:1,transition:"background .15s"}}>
+                    <div style={{fontSize:10,color:isToday?C.accent:C.muted,fontWeight:isToday?700:400,marginBottom:3}}>
+                      {dayNum}{isToday?" · today":""}
                     </div>
-                  </>
-                ):(
-                  <div style={{fontSize:11,color:C.muted,fontStyle:"italic"}}>No target set for this month</div>
-                )}
+                    {mode==="stack"?(
+                      <div onClick={()=>setDayOpen(date)} style={{cursor:"pointer"}}>
+                        <div style={{display:"flex",flexDirection:"column",gap:2,marginBottom:3}}>
+                          {list.slice(0,6).map(v=>(
+                            <div key={v.id} style={{height:3,borderRadius:2,background:colorOf(v.clientId)}}/>
+                          ))}
+                        </div>
+                        <div style={{fontSize:9,color:C.muted}}>{list.length} videos</div>
+                      </div>
+                    ):list.map(v=>{
+                      const col=colorOf(v.clientId);
+                      const late=isPast&&v.stage!=="published";
+                      return(
+                        <div key={v.id} draggable
+                          onDragStart={e=>{e.dataTransfer.setData("videoId",v.id);e.currentTarget.style.opacity=".4";}}
+                          onDragEnd={e=>{e.currentTarget.style.opacity="1";}}
+                          onClick={()=>{const c=clients.find(x=>x.id===v.clientId);if(c)onSelectClient(c);}}
+                          title={`${v.title}${late?" · past its date":""}`}
+                          style={{background:col+"18",borderLeft:`2px solid ${col}`,borderRadius:4,padding:mode==="full"?"3px 5px":"2px 4px",marginBottom:2,cursor:"grab",display:"flex",alignItems:"center",gap:4}}>
+                          {late&&<span style={{width:4,height:4,borderRadius:"50%",background:C.red,flexShrink:0}}/>}
+                          <span style={{fontSize:9,color:C.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",lineHeight:1.3}}>{v.title}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+            </div>
+          </Card>
+
+          {unscheduled.length>0&&(
+            <div style={{display:"flex",alignItems:"center",gap:11,background:C.surface,border:`1px solid ${C.border}`,borderLeft:`3px solid ${BRAND.yellow}`,borderRadius:9,padding:"11px 14px"}}>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:12,color:C.text}}>{unscheduled.length} card{unscheduled.length===1?"":"s"} with no date</div>
+                <div style={{fontSize:10,color:C.muted,marginTop:2}}>They don't appear on the calendar until someone schedules them.</div>
               </div>
-            );
-          })}
+              <button onClick={()=>setTrayOpen(o=>!o)} style={{padding:"5px 12px",border:`0.5px solid ${C.border}`,borderRadius:20,background:C.surface,cursor:"pointer",fontSize:11,color:C.muted,flexShrink:0}}>
+                {trayOpen?"Hide":"Show them"}
+              </button>
+            </div>
+          )}
+          {trayOpen&&unscheduled.length>0&&(
+            <Card pad={12} style={{marginTop:8}}>
+              <div style={{fontSize:9,fontWeight:600,color:C.muted,letterSpacing:1,textTransform:"uppercase",marginBottom:8}}>Drag onto a day to schedule</div>
+              <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                {unscheduled.map(v=>{
+                  const col=colorOf(v.clientId);
+                  return(
+                    <div key={v.id} draggable
+                      onDragStart={e=>{e.dataTransfer.setData("videoId",v.id);e.currentTarget.style.opacity=".4";}}
+                      onDragEnd={e=>{e.currentTarget.style.opacity="1";}}
+                      style={{background:col+"14",border:`0.5px solid ${col}50`,borderLeft:`3px solid ${col}`,borderRadius:6,padding:"5px 9px",cursor:"grab",fontSize:11,color:C.text,maxWidth:210,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                      {v.title}
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
+          )}
+        </>
+      )}
+
+      {dayOpen&&(
+        <div onClick={e=>{if(e.target===e.currentTarget)setDayOpen(null);}}
+          style={{position:"fixed",inset:0,background:"rgba(15,23,42,.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999,padding:16}}>
+          <Card pad={0} style={{width:"min(420px,100%)",maxHeight:"80vh",overflow:"hidden",display:"flex",flexDirection:"column"}}>
+            <div style={{padding:"13px 16px",borderBottom:`0.5px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <div style={{fontSize:14,fontWeight:600,color:C.text}}>{new Date(dayOpen+"T12:00:00").toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"})}</div>
+              <button onClick={()=>setDayOpen(null)} style={{background:"none",border:"none",color:C.muted,fontSize:20,cursor:"pointer"}}>×</button>
+            </div>
+            <div style={{padding:12,overflowY:"auto",display:"flex",flexDirection:"column",gap:6}}>
+              {(byDay[dayOpen]||[]).map(v=>{
+                const col=colorOf(v.clientId);
+                const c=clients.find(x=>x.id===v.clientId);
+                return(
+                  <div key={v.id} onClick={()=>{if(c)onSelectClient(c);}}
+                    style={{background:C.light,borderLeft:`3px solid ${col}`,borderRadius:7,padding:"8px 11px",cursor:"pointer"}}>
+                    <div style={{fontSize:12,color:C.text,marginBottom:2}}>{v.title}</div>
+                    <div style={{fontSize:10,color:C.muted}}>{c?c.name:""} · {(AGENCY_STAGES.find(s=>s.id===v.stage)||{}).label}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </Card>
         </div>
       )}
 
@@ -438,6 +539,7 @@ function AgencyClientPipeline({client,videos,target,month,workspaceId,userId,use
               {cards.map(v=>{
                 const isPub=v.stage==="published";
                 const isRev=v.stage==="review";
+                const isApproved=v.stage==="approved";
                 const daysGone=daysSince(v.publishDate||v.createdAt);
                 const unlocked=isPub&&daysGone>=7;
                 const hasMet=v.metricsAdded;
@@ -513,6 +615,7 @@ function AgencyClientPipeline({client,videos,target,month,workspaceId,userId,use
                             <span style={{width:5,height:5,borderRadius:"50%",background:nCount>0?C.purple:C.border}}/>Notes{nCount>0?` ${nCount}`:""}
                           </button>
                         )}
+                        {stage.id==="approved"&&<button onClick={()=>handleMove(v.id,"published")} style={{fontSize:10,padding:"5px 11px",background:BRAND.green,border:"none",borderRadius:20,cursor:"pointer",color:"#FFF",fontWeight:600}}>Publish →</button>}
                         {stage.id==="editing"&&<button onClick={()=>requestReview(v)} style={{fontSize:10,padding:"5px 11px",background:C.surface,border:`1px solid ${C.border}`,borderRadius:20,cursor:"pointer",color:C.text,fontWeight:500}}>{v.videoUrl?"Send for review →":"Attach video →"}</button>}
                         {isPub&&!hasMet&&unlocked&&<button onClick={()=>setMetricsVid(v)} style={{fontSize:10,padding:"5px 11px",background:C.green,border:"none",borderRadius:20,cursor:"pointer",color:"#fff",fontWeight:600}}>📊 Add metrics</button>}
                         {isCf&&<div style={{display:"flex",gap:4,alignItems:"center",marginLeft:"auto"}}><span style={{fontSize:10,color:C.red,fontWeight:700}}>Delete?</span><button onClick={()=>{onDeleteVideo(v.id);setConfirmDel(null);}} style={{fontSize:10,padding:"2px 7px",background:C.red,border:"none",borderRadius:20,cursor:"pointer",color:"#fff",fontWeight:700}}>Yes</button><button onClick={()=>setConfirmDel(null)} style={{fontSize:10,padding:"2px 7px",background:C.light,border:`1px solid ${C.border}`,borderRadius:20,cursor:"pointer",color:C.text}}>No</button></div>}
@@ -567,7 +670,7 @@ function AgencyClientPipeline({client,videos,target,month,workspaceId,userId,use
         onSave={url=>onMoveVideo(attachVid.id,"review",undefined,{videoUrl:url})}/>}
       {reviewVid&&<ReviewRoom video={(videos||[]).find(x=>x.id===reviewVid.id)||reviewVid} workspaceId={workspaceId} userId={userId} userName={userName}
         onClose={()=>setReviewVid(null)}
-        onApprove={id=>onMoveVideo(id,"published")}
+        onApprove={id=>onMoveVideo(id,"approved")}
         onSendBack={(id,note)=>{handleSendBack(id,note);setReviewVid(null);}}/>}
       {notesVid&&<NotesPanel video={notesVid} workspaceId={workspaceId} userId={userId} userName={userName} onClose={()=>setNotesVid(null)} onSendBack={(id,note)=>{handleSendBack(id,note);setNotesVid(null);}}/>}
         {scriptCard&&<ScriptDocument card={scriptCard} analytics={clientAnalytics} onSave={s=>{onSaveScript&&onSaveScript(scriptCard.id,s);setScriptCard(null);}} onClose={()=>setScriptCard(null)}/>}
@@ -727,6 +830,11 @@ function AgencyApp({user,profile,onLogout}){
     await load();
   },[load]);
 
+  const reschedule=useCallback(async(id,date)=>{
+    setVideos(prev=>prev.map(v=>v.id===id?{...v,targetDate:date}:v));
+    await sbUpdate("agency_videos","id",id,{target_date:date});
+  },[]);
+
   const saveScript=useCallback(async(id,script)=>{
     setVideos(prev=>prev.map(v=>v.id===id?{...v,script}:v));
     await sbUpdate("agency_videos","id",id,{script});
@@ -774,7 +882,7 @@ function AgencyApp({user,profile,onLogout}){
           ?<AgencyAnalytics clients={clients} videos={videos} targets={targets} month={month} onMonthChange={setMonth} onOpenClient={c=>setSelectedClient(c)}/>
           :page==="brainstorm"
           ?<AgencyBrainstorm clients={clients} videos={videos} userId={user.id} month={month} onSendToPipeline={(clientId,ideas)=>{ideas.forEach(v=>addVideo({...v,clientId}));}}/>
-          :<AgencyDashboard clientError={clientError} clients={clients} videos={videos} targets={targets} month={month} onMonthChange={setMonth} onSelectClient={c=>{setSelectedClient(c);}} onAddClient={addClient} onSetTarget={setTarget}/>
+          :<AgencyDashboard clientError={clientError} clients={clients} videos={videos} targets={targets} month={month} onMonthChange={setMonth} onSelectClient={c=>{setSelectedClient(c);}} onAddClient={addClient} onSetTarget={setTarget} onReschedule={reschedule}/>
         }
       </div>
     </div>
