@@ -20,6 +20,7 @@ const AGENCY_STAGES=[
   {id:"production",label:"Production",        color:BRAND.yellow},
   {id:"editing",   label:"Editing",           color:BRAND.blue},
   {id:"review",    label:"Ready for Review",  color:"#F97316"},
+  {id:"approved",  label:"Approved",          color:"#7F77DD"},
   {id:"published", label:"Published",         color:BRAND.green},
 ];
 
