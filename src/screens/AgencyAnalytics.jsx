@@ -43,7 +43,7 @@ function ClientAnalytics({client,videos,month,onBack,onOpenPipeline}){
               <div style={{flex:1,height:7,background:C.light,borderRadius:4,overflow:"hidden"}}>
                 <div style={{width:`${Math.round(r.typical/max*100)}%`,height:"100%",background:r.n<3?color+"55":color,borderRadius:4}}/>
               </div>
-              <span style={{fontSize:10,color:C.muted,width:78,textAlign:"right",whiteSpace:"nowrap"}}>{fmt(r.typical)} · n={r.n}</span>
+              <span style={{fontSize:10,color:C.muted,width:78,textAlign:"right",whiteSpace:"nowrap"}}>{fmt(r.typical)} · {r.n} video{r.n===1?"":"s"}</span>
             </div>
           ))}
         </div>
@@ -248,7 +248,7 @@ function AgencyAnalytics({clients,videos,targets,month,onMonthChange,onOpenClien
                       <div style={{flex:1,height:6,background:C.light,borderRadius:4,overflow:"hidden"}}>
                         <div style={{width:`${Math.round((r.typical||0)/max*100)}%`,height:"100%",background:BRAND.blue,borderRadius:4}}/>
                       </div>
-                      <span style={{fontSize:10,color:C.muted,width:76,textAlign:"right",whiteSpace:"nowrap"}}>{r.typical!==null?fmt(r.typical):"—"} · n={r.n}</span>
+                      <span style={{fontSize:10,color:C.muted,width:76,textAlign:"right",whiteSpace:"nowrap"}}>{r.typical!==null?fmt(r.typical):"—"} · {r.n} video{r.n===1?"":"s"}</span>
                     </div>
                   );
                 })}
@@ -388,7 +388,7 @@ const printClientReport=(client,allVids,measured,month)=>{
     .map(p=>{
       const list=byCh[p];
       const h=list.length>=MIN_PER_CHANNEL?bestBy(list,"hook"):null;
-      return `<tr><td>${esc(p)}</td><td>${list.length}</td><td>${fmt(list.reduce((s,v)=>s+v.views,0))}</td><td>${h?esc(h.value)+` <span class="n">n=${h.n}</span>`:`<span class="n">too few videos</span>`}</td></tr>`;
+      return `<tr><td>${esc(p)}</td><td>${list.length}</td><td>${fmt(list.reduce((s,v)=>s+v.views,0))}</td><td>${h?esc(h.value)+` <span class="n">${h.n} video${h.n===1?"":"s"}</span>`:`<span class="n">too few videos</span>`}</td></tr>`;
     }).join("");
   const top=[...measured].sort((a,b)=>(b.views||0)-(a.views||0)).slice(0,5)
     .map(v=>`<tr><td>${esc(v.title)}</td><td>${esc(v.platform||"")}</td><td>${esc(v.hook||"—")}</td><td>${fmt(v.views||0)}</td></tr>`).join("");
