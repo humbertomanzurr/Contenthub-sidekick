@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { GENERIC_INSIGHTS, POWER_WORDS, SCRIPT_MOVES } from "../data/constants";
+import { GENERIC_INSIGHTS, POWER_WORDS, SCRIPT_MOVES, SCRIPT_MOVES_MORE } from "../data/constants";
 import { BRAND, C, Logo } from "../ui/theme";
 
 function ScriptDocument({card,analytics,onSave,onClose}){
@@ -8,6 +8,7 @@ function ScriptDocument({card,analytics,onSave,onClose}){
     catch(e){return{hook:card.script||"",body:"",cta:"",notes:""};}
   });
   const[focusField,setFocusField]=useState("hook");
+  const[shuffle,setShuffle]=useState(0);
   const[openMove,setOpenMove]=useState(null);
   const[chatInput,setChatInput]=useState("");
   const[chatMsgs,setChatMsgs]=useState([{role:"ai",text:"What part of this video feels hardest to write — the hook, the body, or the CTA?"}]);
@@ -26,7 +27,30 @@ function ScriptDocument({card,analytics,onSave,onClose}){
   const platform=card.platform||"TikTok";
   const secColor={hook:BRAND.red,body:BRAND.yellow,cta:BRAND.blue,notes:BRAND.green}[focusField]||BRAND.red;
   const focusLabel={hook:"Hook",body:"Body",cta:"CTA",notes:"Notes"}[focusField]||"Hook";
-  const moves=[...((SCRIPT_MOVES[focusField]||{})._base||[]),...((SCRIPT_MOVES[focusField]||{})[platform]||[])];
+  // Full pool for this section and platform. Shown six at a time and reshuffled
+  // on demand, so the same five don't greet you every single time.
+  const pool=[
+    ...((SCRIPT_MOVES[focusField]||{})._base||[]),
+    ...((SCRIPT_MOVES[focusField]||{})[platform]||[]),
+    ...((SCRIPT_MOVES_MORE[focusField]||{})._base||[]),
+    ...((SCRIPT_MOVES_MORE[focusField]||{})[platform]||[]),
+  ];
+  const moves=(()=>{
+    const a=[...pool];
+    // Deterministic shuffle per (section, platform, shuffleSeed) so it only
+    // changes when the writer asks, not on every keystroke.
+    let seed=(focusField+platform).split("").reduce((h,c)=>h*31+c.charCodeAt(0),7)+shuffle*9973;
+    const rnd=()=>{seed=(seed*1103515245+12345)&0x7fffffff;return seed/0x7fffffff;};
+    for(let i=a.length-1;i>0;i--){const j=Math.floor(rnd()*(i+1));[a[i],a[j]]=[a[j],a[i]];}
+    return a.slice(0,6);
+  })();
+
+  // What you already wrote in the section before this one. The panel quotes it
+  // back so the next section has to connect to it rather than start fresh.
+  const priorOrder=["hook","body","cta"];
+  const priorIdx=priorOrder.indexOf(focusField);
+  const prior=priorIdx>0?priorOrder.slice(0,priorIdx).map(k=>({key:k,label:{hook:"Hook",body:"Body",cta:"CTA"}[k],text:(sections[k]||"").trim(),color:{hook:BRAND.red,body:BRAND.yellow,cta:BRAND.blue}[k]})).filter(x=>x.text):[];
+  const JOIN_Q={body:"Does the body earn what the hook promised?",cta:"Does the ask follow from what you just said?",notes:"Do these notes match the tone you wrote in?"}[focusField];
   const genericIns=(GENERIC_INSIGHTS[platform]||GENERIC_INSIGHTS["TikTok"]);
   const hasData=analytics?.hasPersonalData;
   const insColors=[BRAND.red,BRAND.yellow,BRAND.blue,BRAND.green,BRAND.red];
@@ -81,8 +105,28 @@ function ScriptDocument({card,analytics,onSave,onClose}){
                 <div style={{width:3,height:11,borderRadius:2,background:secColor,flexShrink:0}}/>
                 <div style={{fontSize:9,fontWeight:600,letterSpacing:1,textTransform:"uppercase",color:C.text}}>{focusLabel} moves</div>
               </div>
-              <div style={{fontSize:10,color:C.muted,lineHeight:1.45}}>Questions to push your thinking. You write the line.</div>
+              <div style={{display:"flex",alignItems:"center",gap:6}}>
+                <div style={{fontSize:10,color:C.muted,lineHeight:1.45,flex:1}}>Questions to push your thinking. You write the line.</div>
+                <button onClick={()=>{setShuffle(s=>s+1);setOpenMove(null);}} title="Show a different set"
+                  style={{background:"none",border:"none",color:C.muted,cursor:"pointer",fontSize:11,padding:2,flexShrink:0}}>↻</button>
+              </div>
             </div>
+
+            {/* What you already wrote, so this section has to connect to it */}
+            {prior.length>0&&(
+              <div style={{padding:"9px 12px",borderBottom:`0.5px solid ${C.border}`,background:C.surface}}>
+                <div style={{fontSize:9,fontWeight:600,letterSpacing:1,textTransform:"uppercase",color:C.muted,marginBottom:6}}>What you've written</div>
+                {prior.map(p=>(
+                  <div key={p.key} style={{borderLeft:`2px solid ${p.color}`,paddingLeft:7,marginBottom:6}}>
+                    <div style={{fontSize:9,color:p.color,fontWeight:600,marginBottom:1}}>{p.label}</div>
+                    <div style={{fontSize:10,color:C.text,lineHeight:1.45}}>
+                      {p.text.length>90?p.text.slice(0,90).trim()+"…":p.text}
+                    </div>
+                  </div>
+                ))}
+                {JOIN_Q&&<div style={{fontSize:10,color:C.muted,lineHeight:1.45,fontStyle:"italic",marginTop:7}}>{JOIN_Q}</div>}
+              </div>
+            )}
             <div style={{flex:1,overflowY:"auto",padding:"10px 10px"}}>
               {moves.map((m,i)=>{
                 const key=`${focusField}-${i}`;
