@@ -3,7 +3,7 @@ import { fmtTime, timeAgo } from "../lib/format";
 import { addNote, getNotes } from "../lib/supabase";
 import { BRAND, Btn, C, PlatformIcon, inp, shMd } from "../ui/theme";
 
-function NotesPanel({video,workspaceId,userId,userName,onClose,onSendBack}){
+function NotesPanel({video,workspaceId,userId,userName,onClose,onSendBack,onResubmit}){
   const[notes,setNotes]=useState([]);
   const[input,setInput]=useState("");
   const[loading,setLoading]=useState(true);
@@ -78,7 +78,8 @@ function NotesPanel({video,workspaceId,userId,userName,onClose,onSendBack}){
           )}
           {notes.map((n,i)=>{
             const isSendBack=n.note.startsWith("↩");
-            const body=isSendBack?n.note.replace(/^↩\s*Sent back:\s*/,""):n.note;
+            const isFix=n.note.startsWith("✔");
+            const body=isSendBack?n.note.replace(/^↩\s*Sent back:\s*/,""):isFix?n.note.replace(/^✔\s*Fixed:\s*/,""):n.note;
             return(
               <div key={i} style={{display:"flex",gap:9}}>
                 <div style={{width:26,height:26,borderRadius:8,flexShrink:0,background:isSendBack?"#FFF7ED":C.light,border:`0.5px solid ${isSendBack?"#FED7AA":C.border}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:600,color:isSendBack?"#C2410C":C.muted}}>
@@ -89,14 +90,35 @@ function NotesPanel({video,workspaceId,userId,userName,onClose,onSendBack}){
                     <span style={{fontSize:11,fontWeight:600,color:C.text}}>{n.author_name||"Team"}</span>
                     <span style={{fontSize:10,color:C.muted}}>{timeAgo(n.created_at)}</span>
                     {isSendBack&&<span style={{fontSize:9,fontWeight:600,color:"#C2410C",background:"#FFF7ED",border:"0.5px solid #FED7AA",borderRadius:20,padding:"1px 7px"}}>Sent back</span>}
+                    {isFix&&<span style={{fontSize:9,fontWeight:600,color:BRAND.green,background:"#F0FBF6",border:`0.5px solid ${BRAND.green}40`,borderRadius:20,padding:"1px 7px"}}>Fixed</span>}
                   </div>
-                  <div style={{fontSize:12,color:C.text,lineHeight:1.6,background:isSendBack?"#FFF7ED":C.light,border:`0.5px solid ${isSendBack?"#FED7AA":C.border}`,borderRadius:9,padding:"8px 10px",wordBreak:"break-word"}}>{body}</div>
+                  <div style={{fontSize:12,color:C.text,lineHeight:1.6,background:isSendBack?"#FFF7ED":isFix?"#F0FBF6":C.light,border:`0.5px solid ${isSendBack?"#FED7AA":isFix?BRAND.green+"40":C.border}`,borderRadius:9,padding:"8px 10px",wordBreak:"break-word"}}>{body}</div>
                 </div>
               </div>
             );
           })}
           <div ref={bottomRef}/>
         </div>
+
+        {/* Editor's side — reply, then hand it back */}
+        {video.stage==="editing"&&onResubmit&&(
+          <div style={{padding:"11px 16px",borderTop:`0.5px solid ${C.border}`,flexShrink:0,background:"#FAFAFA"}}>
+            <div style={{fontSize:10,color:C.muted,lineHeight:1.5,marginBottom:8}}>
+              Say what you changed, then send it back — the reviewer opens knowing what to look at.
+            </div>
+            <button onClick={async()=>{
+                const t=input.trim();
+                if(t){
+                  await addNote(workspaceId,video.id,userId,userName,`✔ Fixed: ${t}`);
+                  setInput("");
+                }
+                onResubmit(video.id);
+              }}
+              style={{width:"100%",padding:"9px 0",background:BRAND.green,border:"none",borderRadius:8,cursor:"pointer",fontSize:12,fontWeight:600,color:"#FFF"}}>
+              {input.trim()?"Send note + back to review →":"Send back to review →"}
+            </button>
+          </div>
+        )}
 
         {/* Send back */}
         {video.stage==="review"&&(
