@@ -75,7 +75,7 @@ export default function App(){
   const pick=path=>{setAuthPath(path==="login"?null:path);setState("auth");};
 
   if(state==="landing")return<Landing onPath={pick}/>;
-  if(state==="auth")return<AuthScreen path={authPath||"creator"} onLogin={login} onBack={()=>setState("landing")}/>;
+  if(state==="auth")return<AuthScreen path={authPath||"login"} onLogin={login} onBack={()=>setState("landing")}/>;
   if(state==="creator"&&user)return<CreatorApp user={user} profile={profile} onLogout={logout}/>;
   if(state==="agency"&&user)return<AgencyApp user={user} profile={profile} onLogout={logout}/>;
   return(
