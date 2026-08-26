@@ -8,35 +8,61 @@ let _token = null;
 
 const _h = (x={}) => ({"apikey":SB_KEY,"Content-Type":"application/json","Authorization":`Bearer ${_token||SB_KEY}`,...x});
 
-const sbGet = async (t,p="") => { try { const r=await fetch(`${SB_URL}/rest/v1/${t}?select=*${p}`,{headers:_h()}); return r.ok?await r.json():[];} catch(e){return [];} };
+// ── ERROR VISIBILITY ─────────────────────────────────────────────────────────
+// A request that failed must never be indistinguishable from one that found
+// nothing. Every helper below used to swallow that difference, which is how a
+// wrong RLS policy or a missing column shows up as an empty pipeline and a
+// silent console. Reads still return []/null so no caller changes shape, but
+// the failure is recorded and logged either way, and the mutations now report
+// {ok,error} the way sbInsertX always did.
+let _lastError = null;
+const sbLastError = () => _lastError;
 
-const sbGetOne = async (t,c,v) => { try { const r=await fetch(`${SB_URL}/rest/v1/${t}?${c}=eq.${encodeURIComponent(v)}&select=*&limit=1`,{headers:_h()}); if(!r.ok)return null; const a=await r.json(); return a[0]||null;} catch(e){return null;} };
+const _note = (t,op,status,message) => {
+  _lastError = {table:t,op,status,message:String(message).slice(0,200),at:new Date().toISOString()};
+  console.error(`[supabase] ${op} ${t} failed:`,status,message);
+  return _lastError;
+};
+
+const _bad = async (t,op,r) => {
+  const raw = await r.text().catch(()=>"");
+  let msg = raw;
+  try { const j=JSON.parse(raw); msg=j.message||j.hint||j.details||raw; } catch(e){}
+  // With RLS on, 401/403 is nearly always an expired session rather than a
+  // real denial — worth saying so, because the two look identical from here.
+  if(r.status===401||r.status===403) msg=`${msg} (session may have expired — sign out and back in)`;
+  return _note(t,op,r.status,msg);
+};
+
+const _net = (t,op,e) => _note(t,op,0,(e&&e.message)||"Network error");
+
+
+const sbGet = async (t,p="") => { try { const r=await fetch(`${SB_URL}/rest/v1/${t}?select=*${p}`,{headers:_h()}); if(!r.ok){await _bad(t,"select",r);return [];} return await r.json();} catch(e){_net(t,"select",e);return [];} };
+
+const sbGetOne = async (t,c,v) => { try { const r=await fetch(`${SB_URL}/rest/v1/${t}?${c}=eq.${encodeURIComponent(v)}&select=*&limit=1`,{headers:_h()}); if(!r.ok){await _bad(t,"select",r);return null;} const a=await r.json(); return a[0]||null;} catch(e){_net(t,"select",e);return null;} };
 
 const sbInsertX = async (t,d) => {
   try {
     const r=await fetch(`${SB_URL}/rest/v1/${t}`,{method:"POST",headers:_h({"Prefer":"return=minimal"}),body:JSON.stringify(Array.isArray(d)?d:[d])});
     if(r.ok)return{ok:true,error:null};
-    const raw=await r.text();
-    let msg=raw;
-    try{const j=JSON.parse(raw);msg=j.message||j.hint||j.details||raw;}catch(e){}
-    console.error("sbInsert failed:",t,r.status,raw);
-    return{ok:false,error:`${r.status} — ${String(msg).slice(0,180)}`};
-  } catch(e){ return{ok:false,error:e.message||"Network error"}; }
+    const e2=await _bad(t,"insert",r);
+    return{ok:false,error:`${e2.status} — ${e2.message}`};
+  } catch(e){ return{ok:false,error:_net(t,"insert",e).message}; }
 };
 
 const sbInsert = async (t,d) => { 
   try { 
     const r=await fetch(`${SB_URL}/rest/v1/${t}`,{method:"POST",headers:_h({"Prefer":"return=minimal"}),body:JSON.stringify(Array.isArray(d)?d:[d])});
-    if(!r.ok){const err=await r.text();console.error("sbInsert failed:",t,r.status,err);}
+    if(!r.ok)await _bad(t,"insert",r);
     return r.ok;
-  } catch(e){console.error("sbInsert error:",e);return false;} 
+  } catch(e){_net(t,"insert",e);return false;} 
 };
 
-const sbUpdate = async (t,c,v,d) => { try { await fetch(`${SB_URL}/rest/v1/${t}?${c}=eq.${encodeURIComponent(v)}`,{method:"PATCH",headers:_h({"Prefer":"return=minimal"}),body:JSON.stringify(d)});} catch(e){} };
+const sbUpdate = async (t,c,v,d) => { try { const r=await fetch(`${SB_URL}/rest/v1/${t}?${c}=eq.${encodeURIComponent(v)}`,{method:"PATCH",headers:_h({"Prefer":"return=minimal"}),body:JSON.stringify(d)}); if(!r.ok)return{ok:false,error:(await _bad(t,"update",r)).message}; return{ok:true,error:null};} catch(e){return{ok:false,error:_net(t,"update",e).message};} };
 
-const sbDelete = async (t,c,v) => { try { await fetch(`${SB_URL}/rest/v1/${t}?${c}=eq.${encodeURIComponent(v)}`,{method:"DELETE",headers:_h()});} catch(e){} };
+const sbDelete = async (t,c,v) => { try { const r=await fetch(`${SB_URL}/rest/v1/${t}?${c}=eq.${encodeURIComponent(v)}`,{method:"DELETE",headers:_h()}); if(!r.ok)return{ok:false,error:(await _bad(t,"delete",r)).message}; return{ok:true,error:null};} catch(e){return{ok:false,error:_net(t,"delete",e).message};} };
 
-const sbUpsert = async (t,d,oc) => { try { await fetch(`${SB_URL}/rest/v1/${t}?on_conflict=${oc}`,{method:"POST",headers:_h({"Prefer":"resolution=merge-duplicates,return=minimal"}),body:JSON.stringify(Array.isArray(d)?d:[d])}); } catch(e){} };
+const sbUpsert = async (t,d,oc) => { try { const r=await fetch(`${SB_URL}/rest/v1/${t}?on_conflict=${oc}`,{method:"POST",headers:_h({"Prefer":"resolution=merge-duplicates,return=minimal"}),body:JSON.stringify(Array.isArray(d)?d:[d])}); if(!r.ok)return{ok:false,error:(await _bad(t,"upsert",r)).message}; return{ok:true,error:null};} catch(e){return{ok:false,error:_net(t,"upsert",e).message};} };
 
 const sbSignIn = async (email,password) => { try { const r=await fetch(`${SB_URL}/auth/v1/token?grant_type=password`,{method:"POST",headers:{"apikey":SB_KEY,"Content-Type":"application/json"},body:JSON.stringify({email,password})}); const d=await r.json(); if(!r.ok)return{error:d}; _token=d.access_token; localStorage.setItem("sk_auth",JSON.stringify({token:d.access_token,refresh_token:d.refresh_token,user:d.user,expires_at:Date.now()+(d.expires_in||3600)*1000})); return{user:d.user,error:null};} catch(e){return{error:{message:e.message}};} };
 
@@ -62,18 +88,22 @@ const sbGetSession = async () => { try { const s=localStorage.getItem("sk_auth")
 const getNotes = async (workspaceId, videoId) => {
   try {
     const r = await fetch(`${SB_URL}/rest/v1/agency_card_notes?workspace_id=eq.${workspaceId}&video_id=eq.${encodeURIComponent(videoId)}&order=created_at.asc&select=*`, {headers:_h()});
-    return r.ok ? await r.json() : [];
-  } catch(e) { return []; }
+    if(!r.ok){ await _bad("agency_card_notes","select",r); return []; }
+    return await r.json();
+  } catch(e) { _net("agency_card_notes","select",e); return []; }
 };
 
 const addNote = async (workspaceId, videoId, userId, authorName, note) => {
   try {
-    await fetch(`${SB_URL}/rest/v1/agency_card_notes`, {
+    const r = await fetch(`${SB_URL}/rest/v1/agency_card_notes`, {
       method:"POST",
       headers:_h({"Prefer":"return=minimal"}),
       body:JSON.stringify({workspace_id:workspaceId,video_id:videoId,user_id:userId,author_name:authorName,note,created_at:new Date().toISOString()})
     });
-  } catch(e) { console.error("addNote",e); }
+    // A review note that vanishes is worse than one that refuses to send.
+    if(!r.ok) return {ok:false, error:(await _bad("agency_card_notes","insert",r)).message};
+    return {ok:true, error:null};
+  } catch(e) { return {ok:false, error:_net("agency_card_notes","insert",e).message}; }
 };
 
 const createWorkspace = async (name, userId) => {
@@ -109,4 +139,4 @@ const getWorkspaceMember = async (userId) => {
 
 // ── AGENCY ONBOARDING ─────────────────────────────────────────────────────────
 
-export { sbSessionSync, SB_KEY, SB_URL, _h, _token, addNote, createWorkspace, getNotes, getWorkspaceMember, sbDelete, sbGet, sbGetOne, sbGetSession, sbInsert, sbInsertX, sbSignIn, sbSignOut, sbSignUp, sbUpdate, sbUpsert };
+export { sbLastError, sbSessionSync, SB_KEY, SB_URL, _h, _token, addNote, createWorkspace, getNotes, getWorkspaceMember, sbDelete, sbGet, sbGetOne, sbGetSession, sbInsert, sbInsertX, sbSignIn, sbSignOut, sbSignUp, sbUpdate, sbUpsert };

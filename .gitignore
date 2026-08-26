@@ -1,0 +1,15 @@
+# Dependencies and build output must never be committed. Neither repo had a
+# .gitignore, so the first `git add .` from a machine with node installed
+# would have committed ~100MB of node_modules into the history.
+node_modules/
+dist/
+.DS_Store
+*.local
+.env
+.env.*
+!.env.example
+
+# Local notes / credentials — never commit a secret. The V2 README carried a
+# production password in plain text for 182 commits; don't repeat it.
+*.pat
+.supabase-pat
