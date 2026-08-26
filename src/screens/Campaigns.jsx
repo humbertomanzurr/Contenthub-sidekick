@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { CAMPAIGN_PLATFORMS, PLATFORM_DOMAINS, QUICK_STARTS, SEARCH_ANGLES, THUMB_COLORS } from "../data/constants";
 import { curMonth, fmt, median, monthLabel, uuid } from "../lib/format";
-import { sbGet, sbInsert, sbUpdate } from "../lib/supabase";
+import { aiHeaders, sbGet, sbInsert, sbUpdate } from "../lib/supabase";
 import { BRAND, C, Card, PlatformIcon, inp } from "../ui/theme";
 
 const verifyRef=(r,platform)=>{
@@ -187,7 +187,7 @@ Return ONLY this JSON, no markdown:
 The four queries must attack the subject from different directions, not rephrase each other.`;
     try{
       const r=await fetch("/api/chat",{
-        method:"POST",headers:{"Content-Type":"application/json"},
+        method:"POST",headers:aiHeaders(),
         body:JSON.stringify({messages:[{role:"user",content:prompt}],systemPrompt:sys})
       });
       const d=await readReply(r);
@@ -202,7 +202,7 @@ The four queries must attack the subject from different directions, not rephrase
   const runBatch=async(prompt,angle,signal,query)=>{
     try{
       const r=await fetch("/api/chat",{
-        method:"POST",signal,headers:{"Content-Type":"application/json"},
+        method:"POST",signal,headers:aiHeaders(),
         body:JSON.stringify({
           messages:[{role:"user",content:`Search ${platform} for: ${query||prompt}\n\nCampaign context: ${prompt}\n\nStart searching now, then return the JSON array.`}],
           systemPrompt:buildSearchSystem(angle,query||prompt),
@@ -325,7 +325,7 @@ Return ONLY valid JSON (no markdown) with this structure:
 Generate exactly 10 ideas. JSON only.`;
       const r=await fetch("/api/chat",{
         method:"POST",
-        headers:{"Content-Type":"application/json"},
+        headers:aiHeaders(),
         body:JSON.stringify({
           messages:[{role:"user",content:`Campaign brief: ${context}
 

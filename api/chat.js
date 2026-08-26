@@ -30,6 +30,63 @@ export default async function handler(req, res) {
       });
     }
 
+    // ── WHO IS ASKING ────────────────────────────────────────────────────
+    // Every call here costs real money -- a search-enabled one runs about
+    // 25 cents -- so this endpoint must not answer strangers. It was open to
+    // the whole internet: an unauthenticated POST returned 200 and spent the
+    // account's credit, with nothing bounding the bill but obscurity.
+    //
+    // Verification is a round trip to Supabase rather than a local signature
+    // check, so it needs no new secret: the URL and anon key are the same
+    // public pair that already ships in the browser bundle. It costs ~100ms,
+    // which is nothing beside a 20-50s model call.
+    const SB_URL = process.env.SUPABASE_URL;
+    const SB_ANON = process.env.SUPABASE_ANON_KEY;
+    if (!SB_URL || !SB_ANON) {
+      return res.status(500).json({
+        error: 'SUPABASE_URL / SUPABASE_ANON_KEY are not set on this deployment',
+        ms: Date.now() - started,
+      });
+    }
+
+    const authHeader = req.headers.authorization || '';
+    const sessionToken = authHeader.startsWith('Bearer ')
+      ? authHeader.slice(7).trim()
+      : '';
+    if (!sessionToken) {
+      return res.status(401).json({
+        error: 'Sign in to use this feature.',
+        ms: Date.now() - started,
+      });
+    }
+
+    // Don't let a slow auth check eat the whole request budget.
+    const authCtl = new AbortController();
+    const authTimer = setTimeout(() => authCtl.abort(), 8000);
+    let who;
+    try {
+      who = await fetch(`${SB_URL}/auth/v1/user`, {
+        signal: authCtl.signal,
+        headers: { apikey: SB_ANON, Authorization: `Bearer ${sessionToken}` },
+      });
+    } catch (e) {
+      return res.status(503).json({
+        error: 'Could not verify your session. Try again in a moment.',
+        ms: Date.now() - started,
+      });
+    } finally {
+      clearTimeout(authTimer);
+    }
+
+    if (!who.ok) {
+      // Almost always an expired session rather than a real intruder, so say
+      // the thing the user can act on.
+      return res.status(401).json({
+        error: 'Your session has expired. Sign out and back in.',
+        ms: Date.now() - started,
+      });
+    }
+
     const body = {
       model: 'claude-opus-5',
       // Thinking is on by default on this model, and thinking tokens count

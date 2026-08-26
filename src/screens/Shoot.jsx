@@ -1,3 +1,4 @@
+import { aiHeaders } from "../lib/supabase";
 import { useState, useEffect } from "react";
 import { C, BRAND, Card, Btn, inp, Logo, PlatformIcon } from "../ui/theme";
 import { uuid } from "../lib/format";
@@ -101,7 +102,7 @@ Hook: ${sections.hook||"not written"}
 Body: ${(sections.body||"").slice(0,300)||"not written"}
 
 Return ONLY a JSON array of 5 short phrases, 1-3 words each, describing the SOUND not the topic. Think tempo, mood, texture — "eerie slow build", "soft morning", "punchy upbeat". No hashtags, no song names, no explanation.`;
-      const r=await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},
+      const r=await fetch("/api/chat",{method:"POST",headers:aiHeaders(),
         body:JSON.stringify({messages:[{role:"user",content:"Suggest sound search phrases."}],systemPrompt:sys})});
       const raw=await r.text();
       let d;try{d=JSON.parse(raw);}catch(e){d=null;}
@@ -125,7 +126,7 @@ Return ONLY a JSON array of 5 short phrases, 1-3 words each, describing the SOUN
     setChatBusy(true);
     try{
       const sys=`You help someone plan a video shoot by asking questions — never by planning it for them. Under 50 words. End with one question. Platform: ${platform}. Video: "${card.title}". They have ${plan.shots.length} shots, ${plan.talent.length} talent, ${plan.locations.length} locations.`;
-      const r=await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},
+      const r=await fetch("/api/chat",{method:"POST",headers:aiHeaders(),
         body:JSON.stringify({messages:[{role:"user",content:msg}],systemPrompt:sys})});
       const raw=await r.text();
       let d;try{d=JSON.parse(raw);}catch(e){d=null;}
