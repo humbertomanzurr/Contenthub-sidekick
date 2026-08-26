@@ -11,10 +11,10 @@ const card = { background: "#FFF", border: "0.5px solid #E4E4E7", borderRadius: 
 
 function PipelineFigure() {
   const cols = [
-    { name: "Brief", color: BRAND.red, items: [{ t: "Haul ASMR" }, { t: "Semana Smarty" }] },
-    { name: "Filming", color: BRAND.yellow, items: [{ t: "Día del padre" }] },
-    { name: "Editing", color: BRAND.blue, items: [{ t: "Top inesperado", flag: "SENT BACK" }] },
-    { name: "Published", color: BRAND.green, items: [{ t: "Vibras verano", meta: "56K views" }] },
+    { name: "Brief", color: BRAND.red, items: [{ t: "Studio tour" }, { t: "Founder Q&A" }] },
+    { name: "Filming", color: BRAND.yellow, items: [{ t: "Product unboxing" }] },
+    { name: "Editing", color: BRAND.blue, items: [{ t: "Before & after", flag: "SENT BACK" }] },
+    { name: "Published", color: BRAND.green, items: [{ t: "Morning routine", meta: "56K views" }] },
   ];
   return (
     <div>
@@ -50,14 +50,14 @@ function PipelineFigure() {
 
 function ScoutingFigure() {
   const rows = [
-    { h: "@houseplusplant", f: "215K followers", ok: true },
-    { h: "@planta.mx", f: "48K followers", ok: true },
-    { h: "@plantlover_mx", f: "profile not found", ok: false },
+    { h: "@theglowdiary", f: "215K followers", ok: true },
+    { h: "@skincarenotes", f: "48K followers", ok: true },
+    { h: "@glowbymara", f: "profile not found", ok: false },
   ];
   return (
     <div>
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 9 }}>
-        {["plants", "Mexico", "10K–100K", "TikTok"].map(t => (
+        {["skincare", "Los Angeles", "10K–100K", "TikTok"].map(t => (
           <span key={t} style={{ fontSize: 10, padding: "3px 9px", borderRadius: 20, background: "#EEF4FC", color: "#2A6FB8", fontWeight: 500 }}>{t}</span>
         ))}
       </div>
@@ -110,13 +110,13 @@ function AnalysisFigure() {
 }
 
 // The three pillars, in the order the work actually happens. Numbering earns
-// its place here: you organise before you scout, and you can only analyse what
+// its place here: you organize before you scout, and you can only analyze what
 // you already ran.
 const PILLARS = [
   {
     n: "01",
     color: BRAND.red,
-    name: "Organising",
+    name: "Organizing",
     tag: "Keeping track of the work",
     headline: "Know what every client’s video is doing today.",
     plain: "Each video is a card. Drag it along as it gets made, and everyone on the team sees the same board. Comments on a cut are pinned to the exact second they refer to.",
