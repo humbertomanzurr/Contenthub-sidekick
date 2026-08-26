@@ -62,7 +62,9 @@ export default async function handler(req, res) {
     // Stop ourselves before the platform does, so the client always gets JSON
     // instead of Vercel's plain-text error page.
     const controller = new AbortController();
-    const budget = useWebSearch ? 50000 : 20000;
+    // 20s was chosen for a non-thinking model. A short Script-panel question
+    // now measures ~14s, which left almost no headroom; maxDuration is 60.
+    const budget = useWebSearch ? 50000 : 40000;
     const timeout = setTimeout(() => controller.abort(), budget);
 
     let response;
@@ -123,9 +125,20 @@ export default async function handler(req, res) {
     // Lets the client tell "searched and found nothing" apart from "never searched".
     const searchCalls = blocks.filter(b => b.type === 'server_tool_use').length;
 
+    // ...but a search that ERRORS also counts as an attempt, so searchCalls
+    // alone reported "searched 5 times" for five failures and no results.
+    // Server tools never throw: a failure is an ordinary 200 whose result
+    // block holds an error object instead of the usual array of hits.
+    // Observed in the wild: allowed_domains ['tiktok.com'] fails this way.
+    const searchErrors = blocks
+      .filter(b => b.type === 'web_search_tool_result')
+      .map(b => (b.content && !Array.isArray(b.content) && b.content.error_code) || null)
+      .filter(Boolean);
+
     return res.status(200).json({
       content: text,
       searchCalls,
+      searchErrors,
       ms: Date.now() - started,
       stopReason: data.stop_reason || null,
     });
