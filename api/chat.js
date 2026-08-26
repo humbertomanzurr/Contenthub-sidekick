@@ -129,7 +129,10 @@ export default async function handler(req, res) {
     // alone reported "searched 5 times" for five failures and no results.
     // Server tools never throw: a failure is an ordinary 200 whose result
     // block holds an error object instead of the usual array of hits.
-    // Observed in the wild: allowed_domains ['tiktok.com'] fails this way.
+    // Seen once against allowed_domains ['tiktok.com'], and not reproducible
+    // on repeat runs -- so treat these as transient. They still burn the
+    // max_uses budget when they happen, which is what turns one bad moment
+    // into an answer with no results at all.
     const searchErrors = blocks
       .filter(b => b.type === 'web_search_tool_result')
       .map(b => (b.content && !Array.isArray(b.content) && b.content.error_code) || null)
