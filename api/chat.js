@@ -142,6 +142,19 @@ export default async function handler(req, res) {
       content: text,
       searchCalls,
       searchErrors,
+      // What this call actually cost, passed straight through. Billable web
+      // searches are counted separately from searchCalls because a search
+      // that errors is not billed, and because search carries a per-request
+      // charge on top of tokens. Without this there is no way to answer
+      // "what does a user cost us a month", which is what pricing depends on.
+      usage: data.usage ? {
+        input: data.usage.input_tokens || 0,
+        output: data.usage.output_tokens || 0,
+        cacheRead: data.usage.cache_read_input_tokens || 0,
+        cacheWrite: data.usage.cache_creation_input_tokens || 0,
+        webSearches: (data.usage.server_tool_use
+          && data.usage.server_tool_use.web_search_requests) || 0,
+      } : null,
       ms: Date.now() - started,
       stopReason: data.stop_reason || null,
     });
