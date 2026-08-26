@@ -22,16 +22,32 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'messages is required' });
     }
 
+    // Fail loudly rather than letting Anthropic return a confusing 401.
+    if (!process.env.ANTHROPIC_API_KEY) {
+      return res.status(500).json({
+        error: 'ANTHROPIC_API_KEY is not set on this deployment',
+        ms: Date.now() - started,
+      });
+    }
+
     const body = {
-      model: 'claude-sonnet-4-6',
-      max_tokens: useWebSearch ? 8192 : 2048,
+      model: 'claude-opus-5',
+      // Thinking is on by default on this model, and thinking tokens count
+      // toward max_tokens — the old 8192/2048 pair would truncate mid-answer.
+      max_tokens: useWebSearch ? 16000 : 4096,
+      // Everything this endpoint does is retrieval and short answers, never
+      // deep reasoning, so buy the least thinking that does the job. This is
+      // what keeps latency near where it was before the model change.
+      output_config: { effort: 'low' },
       system: systemPrompt,
       messages,
     };
 
     if (useWebSearch) {
       const tool = {
-        type: 'web_search_20250305',
+        // Dynamic filtering. Needs no anthropic-beta header — the header is
+        // what was causing 400s back when this ran on the older tool version.
+        type: 'web_search_20260209',
         name: 'web_search',
         max_uses: maxUses || 3,
       };
@@ -82,6 +98,19 @@ export default async function handler(req, res) {
         error: String(detail).slice(0, 300),
         status: response.status,
         ms: Date.now() - started,
+      });
+    }
+
+    // A refusal arrives as a normal 200 with empty text, so without this the
+    // client would show a blank answer and no reason for it.
+    if (data.stop_reason === 'refusal') {
+      return res.status(200).json({
+        content: '',
+        refused: true,
+        error: 'The model declined this request.',
+        searchCalls: 0,
+        ms: Date.now() - started,
+        stopReason: 'refusal',
       });
     }
 
