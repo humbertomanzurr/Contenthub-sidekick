@@ -70,8 +70,20 @@ export default async function handler(req, res) {
         headers: { apikey: SB_ANON, Authorization: `Bearer ${sessionToken}` },
       });
     } catch (e) {
+      // A throw here is almost never the network — it is the config. An
+      // invalid URL and a header value carrying a stray newline both fail
+      // instantly and identically, so name the cause instead of hiding it.
+      const detail = (e && e.message) || String(e);
+      const suspectUrl = !/^https:\/\/[a-z0-9-]+\.supabase\.co$/.test(SB_URL);
+      const suspectKey = /\s/.test(SB_ANON);
       return res.status(503).json({
-        error: 'Could not verify your session. Try again in a moment.',
+        error: 'Could not verify your session.',
+        detail: String(detail).slice(0, 200),
+        // Config shape, never the values themselves.
+        supabaseUrlLooksWrong: suspectUrl,
+        supabaseKeyHasWhitespace: suspectKey,
+        urlLength: String(SB_URL || '').length,
+        keyLength: String(SB_ANON || '').length,
         ms: Date.now() - started,
       });
     } finally {
