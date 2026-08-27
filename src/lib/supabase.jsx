@@ -21,6 +21,14 @@ const aiHeaders = () => ({
 
 const sbGet = async (t,p="") => { try { const r=await fetch(`${SB_URL}/rest/v1/${t}?select=*${p}`,{headers:_h()}); return r.ok?await r.json():[];} catch(e){return [];} };
 
+const sbGetWhere = async (t,col,val,extra="") => {
+  try {
+    const r=await fetch(`${SB_URL}/rest/v1/${t}?${col}=eq.${encodeURIComponent(val)}&select=*${extra}`,{headers:_h()});
+    if(!r.ok){await _bad(t,"select",r);return [];}
+    return await r.json();
+  } catch(e){ _net(t,"select",e); return []; }
+};
+
 const sbGetOne = async (t,c,v) => { try { const r=await fetch(`${SB_URL}/rest/v1/${t}?${c}=eq.${encodeURIComponent(v)}&select=*&limit=1`,{headers:_h()}); if(!r.ok)return null; const a=await r.json(); return a[0]||null;} catch(e){return null;} };
 
 const sbInsertX = async (t,d) => {
@@ -120,4 +128,4 @@ const getWorkspaceMember = async (userId) => {
 
 // ── AGENCY ONBOARDING ─────────────────────────────────────────────────────────
 
-export { aiHeaders, sbSessionSync, SB_KEY, SB_URL, _h, _token, addNote, createWorkspace, getNotes, getWorkspaceMember, sbDelete, sbGet, sbGetOne, sbGetSession, sbInsert, sbInsertX, sbSignIn, sbSignOut, sbSignUp, sbUpdate, sbUpsert };
+export { sbGetWhere, aiHeaders, sbSessionSync, SB_KEY, SB_URL, _h, _token, addNote, createWorkspace, getNotes, getWorkspaceMember, sbDelete, sbGet, sbGetOne, sbGetSession, sbInsert, sbInsertX, sbSignIn, sbSignOut, sbSignUp, sbUpdate, sbUpsert };

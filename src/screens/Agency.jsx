@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { AGENCY_STAGES, CLIENT_QUESTIONS } from "../data/constants";
 import { addMonths, curMonth, daysSince, fmt, monthLabel, uuid } from "../lib/format";
-import { createWorkspace, getNotes, getWorkspaceMember, sbDelete, sbInsert, sbInsertX, sbUpdate, sbUpsert } from "../lib/supabase";
+import { createWorkspace, getNotes, getWorkspaceMember, sbDelete, sbGetWhere, sbInsert, sbInsertX, sbUpdate, sbUpsert } from "../lib/supabase";
 import { AgencyAnalytics } from "./AgencyAnalytics";
+import { SettingsPage } from "./Settings";
 import { AttachVideoModal, NotesPanel, ReviewRoom } from "./AgencyReview";
 import { AddVideoModal, GoalModal, MetricsModal } from "./Business";
 import { CampaignCreator } from "./Campaigns";
@@ -858,6 +859,9 @@ function AgencyApp({user,profile,onLogout}){
   const[month,setMonth]=useState(curMonth());
   const[selectedClient,setSelectedClient]=useState(null);
   const[page,setPage]=useState("dashboard");
+  const[menuOpen,setMenuOpen]=useState(false);
+  const[settingsTab,setSettingsTab]=useState("users");
+  const[wsName,setWsName]=useState("");
   const[loading,setLoading]=useState(true);
   const[needsOnboarding,setNeedsOnboarding]=useState(false);
   const[wsId,setWsId]=useState(null);
@@ -876,6 +880,8 @@ function AgencyApp({user,profile,onLogout}){
       }
       const wid=mem.workspace_id;
       setWsId(wid);
+      if(mem.workspaces?.name)setWsName(mem.workspaces.name);
+      else sbGetWhere("workspaces","id",wid).then(r=>{if(r&&r[0]?.name)setWsName(r[0].name);});
       setNeedsOnboarding(false);
       const[cls,vids,tgts]=await Promise.all([
         sbGetWhere("agency_clients","workspace_id",wid,"&order=created_at.asc"),
@@ -941,7 +947,7 @@ function AgencyApp({user,profile,onLogout}){
 
   const saveMetrics=useCallback(async(id,m)=>{
     setVideos(prev=>prev.map(v=>v.id===id?{...v,...m,metricsAdded:true}:v));
-    await sbUpdate("agency_videos","id",id,{url:m.url||"",hook:m.hook||"",format:m.format||"",cta:m.cta||"",views:m.views||0,likes:m.likes||0,comments:m.comments||0,shares:m.shares||0,saves:m.saves||0,para_ti:m.paraTi||null,siguiendo:m.siguiendo||null,busqueda:m.busqueda||null,pauta:0,metrics_added:true});
+    await sbUpdate("agency_videos","id",id,{url:m.url||"",hook:m.hook||"",format:m.format||"",cta:m.cta||"",views:m.views||0,likes:m.likes||0,comments:m.comments||0,shares:m.shares||0,saves:m.saves||0,para_ti:m.paraTi||null,siguiendo:m.siguiendo||null,busqueda:m.busqueda||null,metrics_added:true});
     await load();
   },[load]);
 
@@ -990,9 +996,42 @@ function AgencyApp({user,profile,onLogout}){
               style={{padding:"5px 12px",border:"none",cursor:"pointer",fontSize:12,fontWeight:page===id&&!selectedClient?600:400,color:page===id&&!selectedClient?C.text:C.muted,background:page===id&&!selectedClient?C.light:"transparent",borderRadius:7}}>{label}</button>
           ))}
         </div>
-        <div style={{display:"flex",alignItems:"center",gap:8}}>
-          <span style={{fontSize:11,color:C.muted}}>{profile?.name||user.email}</span>
-          <button onClick={onLogout} style={{background:"none",border:"none",color:C.muted,cursor:"pointer",fontSize:11}}>Sign out</button>
+        <div style={{position:"relative"}}>
+          <button onClick={()=>setMenuOpen(o=>!o)}
+            style={{display:"flex",alignItems:"center",gap:7,padding:"4px 10px 4px 4px",border:`1px solid ${menuOpen?C.text:C.border}`,borderRadius:20,background:C.surface,cursor:"pointer",fontSize:12,color:C.text}}>
+            <span style={{width:22,height:22,borderRadius:7,background:C.accent,color:"#FFF",display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:700}}>
+              {(profile?.name||user.email||"?").trim().charAt(0).toUpperCase()}
+            </span>
+            {(profile?.name||user.email||"").split("@")[0]}
+            <span style={{fontSize:9,color:C.muted,transform:menuOpen?"rotate(180deg)":"none",transition:"transform .15s"}}>▾</span>
+          </button>
+          {menuOpen&&(
+            <>
+              <div onClick={()=>setMenuOpen(false)} style={{position:"fixed",inset:0,zIndex:900}}/>
+              <div style={{position:"absolute",top:"calc(100% + 6px)",right:0,width:238,background:C.surface,border:`1px solid ${C.border}`,borderRadius:12,boxShadow:shMd,zIndex:901,padding:6}}>
+                <div style={{display:"flex",alignItems:"center",gap:9,padding:"7px 8px 10px",borderBottom:`1px solid ${C.border}`,marginBottom:5}}>
+                  <span style={{width:28,height:28,borderRadius:9,background:C.accent,color:"#FFF",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,flexShrink:0}}>
+                    {(profile?.name||user.email||"?").trim().charAt(0).toUpperCase()}
+                  </span>
+                  <div style={{minWidth:0}}>
+                    <div style={{fontSize:12.5,fontWeight:600,color:C.text}}>{profile?.name||user.email}</div>
+                    <div style={{fontSize:11,color:C.muted,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{wsName||"Your agency"}</div>
+                  </div>
+                </div>
+                {[["users","Users"],["clients","Clients"],["workspace","Workspace"],["account","My account"]].map(([id,label])=>(
+                  <button key={id} onClick={()=>{setSettingsTab(id);setPage("settings");setSelectedClient(null);setMenuOpen(false);}}
+                    style={{display:"block",width:"100%",textAlign:"left",padding:"8px 9px",border:"none",background:"transparent",cursor:"pointer",fontSize:12.5,color:C.text,borderRadius:8}}
+                    onMouseEnter={e=>e.currentTarget.style.background=C.light}
+                    onMouseLeave={e=>e.currentTarget.style.background="transparent"}>{label}</button>
+                ))}
+                <div style={{height:1,background:C.border,margin:"5px 4px"}}/>
+                <button onClick={onLogout}
+                  style={{display:"block",width:"100%",textAlign:"left",padding:"8px 9px",border:"none",background:"transparent",cursor:"pointer",fontSize:12.5,color:C.red,borderRadius:8}}
+                  onMouseEnter={e=>e.currentTarget.style.background=C.light}
+                  onMouseLeave={e=>e.currentTarget.style.background="transparent"}>Sign out</button>
+              </div>
+            </>
+          )}
         </div>
       </div>
       <div style={{flex:1,overflowY:"auto",padding:20}}>
@@ -1000,6 +1039,9 @@ function AgencyApp({user,profile,onLogout}){
           ?<AgencyClientPipeline client={selectedClient} videos={clientVids} target={clientTarget} month={month} workspaceId={wsId} userId={user.id} userName={profile?.name||user.email} onAddVideo={addVideo} onMoveVideo={moveVideo} onMetrics={saveMetrics} onDeleteVideo={deleteVideo} onSetTarget={setTarget} onSaveScript={saveScript} onSaveShoot={saveShoot} onBack={()=>setSelectedClient(null)}/>
           :page==="analytics"
           ?<AgencyAnalytics clients={clients} videos={videos} targets={targets} month={month} onMonthChange={setMonth} onOpenClient={c=>setSelectedClient(c)}/>
+          :page==="settings"
+          ?<SettingsPage workspaceId={wsId} wsName={wsName} user={user} profile={profile}
+             tab={settingsTab} onTab={setSettingsTab} clients={clients} onReload={load}/>
           :page==="brainstorm"
           ?<AgencyBrainstorm clients={clients} videos={videos} userId={user.id} month={month} onSendToPipeline={(clientId,ideas)=>{ideas.forEach(v=>addVideo({...v,clientId}));}}/>
           :<AgencyDashboard clientError={clientError} clients={clients} videos={videos} targets={targets} month={month} onMonthChange={setMonth} onSelectClient={c=>{setSelectedClient(c);}} onAddClient={addClient} onSetTarget={setTarget} onReschedule={reschedule}/>
