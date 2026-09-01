@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AGENCY_STAGES, CLIENT_QUESTIONS } from "../data/constants";
+import { AGENCY_STAGES, CLIENT_QUESTIONS, STAGES } from "../data/constants";
 import { addMonths, curMonth, daysSince, fmt, monthLabel, uuid } from "../lib/format";
 import { createWorkspace, getNotes, getWorkspaceMember, sbDelete, sbGetWhere, sbInsert, sbInsertX, sbUpdate, sbUpsert } from "../lib/supabase";
 import { AgencyAnalytics } from "./AgencyAnalytics";
@@ -526,7 +526,11 @@ function AgencyDashboard({clientError,clients,videos,targets,month,onMonthChange
 // second. Drive/YouTube embeds are cross-origin — the browser will not expose
 // their playhead — so those get a manual timestamp field instead.
 
-function AgencyClientPipeline({client,videos,target,month,workspaceId,userId,userName,onAddVideo,onMoveVideo,onMetrics,onDeleteVideo,onSetTarget,onSaveScript,onSaveShoot,onBack}){
+function AgencyClientPipeline({client,videos,target,month,workspaceId,userId,userName,onAddVideo,onMoveVideo,onMetrics,onDeleteVideo,onSetTarget,onSaveScript,onSaveShoot,onBack,solo,canAnalytics=true,onUpsell}){
+  // Review and Approved only mean something when a second person signs work
+  // off. On a solo plan the board is Idea, Production, Editing, Published --
+  // the four stages the old Business portal always used.
+  const stages = solo ? STAGES : AGENCY_STAGES;
   const[showAdd,setShowAdd]=useState(false);
   const[showGoal,setShowGoal]=useState(false);
   const[metricsVid,setMetricsVid]=useState(null);
@@ -613,9 +617,16 @@ function AgencyClientPipeline({client,videos,target,month,workspaceId,userId,use
       </Card>
 
       {/* 5-stage Kanban */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:9}}>
-        {AGENCY_STAGES.map(stage=>{
-          const cards=mVids.filter(v=>v.stage===stage.id);
+      <div style={{display:"grid",gridTemplateColumns:`repeat(${stages.length},1fr)`,gap:9}}>
+        {stages.map(stage=>{
+          // A card parked in Review or Approved has no column on a solo board.
+          // Bucket it into the nearest stage that exists rather than letting it
+          // disappear — an invisible card is worse than one in the wrong place.
+          const bucket=v=>!solo?v.stage
+            :v.stage==="review"?"editing"
+            :v.stage==="approved"?"published"
+            :v.stage;
+          const cards=mVids.filter(v=>bucket(v)===stage.id);
           const isReview=stage.id==="review";
           return(
             <div key={stage.id}
@@ -709,15 +720,18 @@ function AgencyClientPipeline({client,videos,target,month,workspaceId,userId,use
                         )}
                         {stage.id==="approved"&&<button onClick={()=>handleMove(v.id,"published")} style={{fontSize:10,padding:"5px 11px",background:BRAND.green,border:"none",borderRadius:20,cursor:"pointer",color:"#FFF",fontWeight:600}}>Publish →</button>}
                         {stage.id==="editing"&&<button onClick={()=>requestReview(v)} style={{fontSize:10,padding:"5px 11px",background:C.surface,border:`1px solid ${C.border}`,borderRadius:20,cursor:"pointer",color:C.text,fontWeight:500}}>{v.videoUrl?"Send for review →":"Attach video →"}</button>}
-                        {isPub&&!hasMet&&unlocked&&<button onClick={()=>setMetricsVid(v)} style={{fontSize:10,padding:"5px 11px",background:C.green,border:"none",borderRadius:20,cursor:"pointer",color:"#fff",fontWeight:600}}>📊 Add metrics</button>}
+                        {isPub&&!hasMet&&unlocked&&<button onClick={()=>canAnalytics
+                          ?setMetricsVid(v)
+                          :onUpsell&&onUpsell({title:"Tracking results is part of Business",
+                              body:"Add this video's views and engagement, and the app starts learning which hooks and formats work for your brand. That is what the upgrade buys — the numbers are yours either way, we just can't do the maths for you yet."})} style={{fontSize:10,padding:"5px 11px",background:C.green,border:"none",borderRadius:20,cursor:"pointer",color:"#fff",fontWeight:600}}>📊 Add metrics</button>}
                         {isCf&&<div style={{display:"flex",gap:4,alignItems:"center",marginLeft:"auto"}}><span style={{fontSize:10,color:C.red,fontWeight:700}}>Delete?</span><button onClick={()=>{onDeleteVideo(v.id);setConfirmDel(null);}} style={{fontSize:10,padding:"2px 7px",background:C.red,border:"none",borderRadius:20,cursor:"pointer",color:"#fff",fontWeight:700}}>Yes</button><button onClick={()=>setConfirmDel(null)} style={{fontSize:10,padding:"2px 7px",background:C.light,border:`1px solid ${C.border}`,borderRadius:20,cursor:"pointer",color:C.text}}>No</button></div>}
                       </div>
 
                       {/* Progress across the 5 agency stages + script entry */}
                       <div style={{marginTop:8,marginLeft:-12,marginRight:-12,borderTop:`0.5px solid ${C.border}`,padding:"8px 12px",display:"flex",flexDirection:"column",gap:7}}>
                         <div style={{display:"flex",gap:3}}>
-                          {AGENCY_STAGES.map((st2,i2)=>{
-                            const idx=AGENCY_STAGES.findIndex(x=>x.id===stage.id);
+                          {stages.map((st2,i2)=>{
+                            const idx=stages.findIndex(x=>x.id===stage.id);
                             return <div key={st2.id} style={{height:4,flex:1,borderRadius:2,background:i2<=idx?st2.color:C.border,transition:"background .3s"}}/>;
                           })}
                         </div>
@@ -1129,7 +1143,7 @@ function AgencyApp({user,profile,onLogout}){
       <UpgradeSheet reason={upsell} onClose={()=>setUpsell(null)}/>
       <div style={{flex:1,overflowY:"auto",padding:20}}>
         {selectedClient
-          ?<AgencyClientPipeline client={selectedClient} videos={clientVids} target={clientTarget} month={month} workspaceId={wsId} userId={user.id} userName={profile?.name||user.email} onAddVideo={addVideo} onMoveVideo={moveVideo} onMetrics={saveMetrics} onDeleteVideo={deleteVideo} onSetTarget={setTarget} onSaveScript={saveScript} onSaveShoot={saveShoot} onBack={()=>setSelectedClient(null)}/>
+          ?<AgencyClientPipeline solo={solo} canAnalytics={plan.analytics} onUpsell={setUpsell} client={selectedClient} videos={clientVids} target={clientTarget} month={month} workspaceId={wsId} userId={user.id} userName={profile?.name||user.email} onAddVideo={addVideo} onMoveVideo={moveVideo} onMetrics={saveMetrics} onDeleteVideo={deleteVideo} onSetTarget={setTarget} onSaveScript={saveScript} onSaveShoot={saveShoot} onBack={()=>setSelectedClient(null)}/>
           :page==="analytics"
           ?<AgencyAnalytics clients={clients} videos={videos} targets={targets} month={month} onMonthChange={setMonth} onOpenClient={c=>setSelectedClient(c)}/>
           :page==="settings"
