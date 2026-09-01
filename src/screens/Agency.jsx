@@ -4,6 +4,7 @@ import { addMonths, curMonth, daysSince, fmt, monthLabel, uuid } from "../lib/fo
 import { createWorkspace, getNotes, getWorkspaceMember, sbDelete, sbGetWhere, sbInsert, sbInsertX, sbUpdate, sbUpsert } from "../lib/supabase";
 import { AgencyAnalytics } from "./AgencyAnalytics";
 import { SettingsPage } from "./Settings";
+import { TourBubble } from "./Business";
 import { PLANS, cardLimitReason, isSolo, planOf } from "../lib/plan";
 import { AttachVideoModal, NotesPanel, ReviewRoom } from "./AgencyReview";
 import { AddVideoModal, GoalModal, MetricsModal } from "./Business";
@@ -533,8 +534,18 @@ function AgencyClientPipeline({client,videos,target,month,workspaceId,userId,use
   const stages = solo ? STAGES : AGENCY_STAGES;
   const[showAdd,setShowAdd]=useState(false);
   const[showGoal,setShowGoal]=useState(false);
+  // The guided tour from the old Business portal. Six steps, anchored to real
+  // elements — it teaches by pointing at the thing, not by describing it.
+  // Solo plans only: an agency arrives knowing what a pipeline is.
+  const tourKey=`sk_tour_${userId}`;
+  const[tourStep,setTourStep]=useState(0);
+  const refGoal=useRef(null), refAdd=useRef(null), refStages=useRef(null), refPublished=useRef(null);
+  useEffect(()=>{
+    if(!solo)return;
+    try{ if(!localStorage.getItem(tourKey)) setTourStep(1); }catch(e){}
+  },[solo,tourKey]);
+  const endTour=()=>{ setTourStep(0); try{ localStorage.setItem(tourKey,"done"); }catch(e){} };
   const[metricsVid,setMetricsVid]=useState(null);
-  const[overrideVid,setOverrideVid]=useState(null);
   const[publishDateModal,setPublishDateModal]=useState(null);
   const[publishDateVal,setPublishDateVal]=useState("");
   const[confirmDel,setConfirmDel]=useState(null);
@@ -599,8 +610,8 @@ function AgencyClientPipeline({client,videos,target,month,workspaceId,userId,use
           <div style={{fontSize:17,fontWeight:800,color:C.text}}>{client.name}</div>
         </div>
         <div style={{display:"flex",gap:7,alignItems:"center"}}>
-          <button onClick={()=>setShowGoal(true)} style={{padding:"6px 13px",border:`1px solid ${C.border}`,borderRadius:7,background:C.surface,cursor:"pointer",fontSize:12,color:C.muted,fontWeight:600}}>🎯 {goal>0?`${goal} videos`:"Set goal"}</button>
-          <Btn primary onClick={()=>setShowAdd(true)}>+ Add idea</Btn>
+          <button ref={refGoal} onClick={()=>setShowGoal(true)} style={{padding:"6px 13px",border:`1px solid ${C.border}`,borderRadius:7,background:C.surface,cursor:"pointer",fontSize:12,color:C.muted,fontWeight:600}}>🎯 {goal>0?`${goal} videos`:"Set goal"}</button>
+          <span ref={refAdd}><Btn primary onClick={()=>{setShowAdd(true);if(tourStep===2)setTourStep(3);}}>+ Add idea</Btn></span>
         </div>
       </div>
 
@@ -617,7 +628,7 @@ function AgencyClientPipeline({client,videos,target,month,workspaceId,userId,use
       </Card>
 
       {/* 5-stage Kanban */}
-      <div style={{display:"grid",gridTemplateColumns:`repeat(${stages.length},1fr)`,gap:9}}>
+      <div ref={refStages} style={{display:"grid",gridTemplateColumns:`repeat(${stages.length},1fr)`,gap:9}}>
         {stages.map(stage=>{
           // A card parked in Review or Approved has no column on a solo board.
           // Bucket it into the nearest stage that exists rather than letting it
@@ -630,6 +641,7 @@ function AgencyClientPipeline({client,videos,target,month,workspaceId,userId,use
           const isReview=stage.id==="review";
           return(
             <div key={stage.id}
+              ref={stage.id==="published"?refPublished:null}
               onDragOver={e=>e.preventDefault()}
               onDragEnter={e=>{e.currentTarget.style.background=stage.color+"18";e.currentTarget.style.outline=`2px dashed ${stage.color}`;}}
               onDragLeave={e=>{e.currentTarget.style.background=C.light;e.currentTarget.style.outline="none";}}
@@ -646,7 +658,6 @@ function AgencyClientPipeline({client,videos,target,month,workspaceId,userId,use
                 const daysGone=daysSince(v.publishDate||v.createdAt);
                 const unlocked=isPub&&daysGone>=7;
                 const hasMet=v.metricsAdded;
-                const lockPct=Math.min(100,Math.round((daysGone/7)*100));
                 const unlockDate=()=>{const d=new Date(v.publishDate||v.createdAt);d.setDate(d.getDate()+7);return d.toLocaleDateString("en-US",{month:"short",day:"numeric"});};
                 const isCf=confirmDel===v.id;
                 const needsRevision=!!v.revision&&(stage.id==="editing"||stage.id==="review");
@@ -683,21 +694,8 @@ function AgencyClientPipeline({client,videos,target,month,workspaceId,userId,use
                       </div>
 
                       {isPub&&!hasMet&&!unlocked&&(
-                        <div style={{marginBottom:8,padding:"7px 9px",background:"#F8FAFC",borderRadius:7,border:`1px solid ${C.border}`}}>
-                          <div style={{fontSize:10,fontWeight:600,color:C.muted,marginBottom:5}}>📅 Metrics unlock {unlockDate()}</div>
-                          <div style={{background:C.border,borderRadius:20,height:4,overflow:"hidden"}}>
-                            <div style={{width:`${lockPct}%`,height:"100%",background:lockPct>=85?C.green:C.accent,borderRadius:20,transition:"width .3s"}}/>
-                          </div>
-                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:3}}>
-                            <span style={{fontSize:9,color:C.muted}}>{daysGone} of 7 days</span>
-                            <span onClick={()=>setOverrideVid(v)} style={{fontSize:9,color:C.accent,cursor:"pointer",textDecoration:"underline"}}>Already have data?</span>
-                          </div>
-                        </div>
-                      )}
-                      {isPub&&!hasMet&&unlocked&&(
-                        <div style={{marginBottom:8,padding:"7px 9px",background:"#DCFCE7",borderRadius:7,border:"1px solid #BBF7D0",display:"flex",alignItems:"center",gap:6}}>
-                          <span style={{fontSize:13}}>✅</span>
-                          <div><div style={{fontSize:11,fontWeight:700,color:C.green}}>Ready to add metrics</div><div style={{fontSize:9,color:"#15803D"}}>7 days of data</div></div>
+                        <div style={{marginBottom:8,fontSize:10,color:C.muted,lineHeight:1.45}}>
+                          Views usually keep climbing for about a week — numbers from {unlockDate()} will be steadier.
                         </div>
                       )}
                       {hasMet&&<div style={{marginBottom:8,padding:"5px 9px",background:"#DCFCE7",borderRadius:7,border:"1px solid #BBF7D0",display:"inline-flex",alignItems:"center",gap:5}}><span style={{fontSize:10}}>📊</span><span style={{fontSize:10,fontWeight:700,color:C.green}}>{fmt(v.views||0)} views</span></div>}
@@ -720,7 +718,7 @@ function AgencyClientPipeline({client,videos,target,month,workspaceId,userId,use
                         )}
                         {stage.id==="approved"&&<button onClick={()=>handleMove(v.id,"published")} style={{fontSize:10,padding:"5px 11px",background:BRAND.green,border:"none",borderRadius:20,cursor:"pointer",color:"#FFF",fontWeight:600}}>Publish →</button>}
                         {stage.id==="editing"&&<button onClick={()=>requestReview(v)} style={{fontSize:10,padding:"5px 11px",background:C.surface,border:`1px solid ${C.border}`,borderRadius:20,cursor:"pointer",color:C.text,fontWeight:500}}>{v.videoUrl?"Send for review →":"Attach video →"}</button>}
-                        {isPub&&!hasMet&&unlocked&&<button onClick={()=>canAnalytics
+                        {isPub&&!hasMet&&<button onClick={()=>canAnalytics
                           ?setMetricsVid(v)
                           :onUpsell&&onUpsell({title:"Tracking results is part of Business",
                               body:"Add this video's views and engagement, and the app starts learning which hooks and formats work for your brand. That is what the upgrade buys — the numbers are yours either way, we just can't do the maths for you yet."})} style={{fontSize:10,padding:"5px 11px",background:C.green,border:"none",borderRadius:20,cursor:"pointer",color:"#fff",fontWeight:600}}>📊 Add metrics</button>}
@@ -767,6 +765,37 @@ function AgencyClientPipeline({client,videos,target,month,workspaceId,userId,use
       </div>
 
       {/* Modals */}
+
+      {solo&&tourStep===1&&<TourBubble step={1} total={6} emoji="🎯" targetRef={refGoal}
+        title="Start with a number"
+        body="Decide how many videos you want out this month. It is the one number the whole board is measured against, and it fills your pipeline with slots to fill."
+        action="Set my goal →" onAction={()=>{setShowGoal(true);setTourStep(2);}} onSkip={endTour}/>}
+
+      {solo&&tourStep===2&&<TourBubble step={2} total={6} emoji="➕" targetRef={refAdd}
+        title="Add your first idea"
+        body="Think of one video you want to make this week. It does not have to be good yet — a working title is enough. You can rename it any time."
+        action="Got it →" onAction={()=>setTourStep(3)} onSkip={endTour}/>}
+
+      {solo&&tourStep===3&&<TourBubble step={3} total={6} emoji="🚀" targetRef={refStages} side="top"
+        title="Drag it as you go"
+        body="Idea, Production, Editing, Published. Move the card when the work moves — the board is only useful if it says what is actually true."
+        action="Got it →" onAction={()=>setTourStep(4)} onSkip={endTour}/>}
+
+      {solo&&tourStep===4&&<TourBubble step={4} total={6} emoji="📱" targetRef={refPublished} side="top"
+        title="You publish it, not us"
+        body="Post the video wherever it lives — TikTok, Instagram, wherever — then drag the card to Published. This app never posts anything for you."
+        action="Got it →" onAction={()=>setTourStep(5)} onSkip={endTour}/>}
+
+      {solo&&tourStep===5&&<TourBubble step={5} total={6} emoji="📊" targetRef={refPublished} side="top"
+        title="Then come back with the numbers"
+        body="Views keep climbing for about a week, so a number from day seven tells you more than one from day one. You can add them whenever you like — it is a suggestion, not a lock."
+        action="Got it →" onAction={()=>setTourStep(6)} onSkip={endTour}/>}
+
+      {solo&&tourStep===6&&<TourBubble step={6} total={6} emoji="✨" targetRef={refStages} side="top"
+        title="That is the whole loop"
+        body="Plan, make, publish, record what happened. Do it a few times and the app can start telling you which openings and formats actually work for you — that part comes with Business."
+        action="Let me at it →" onAction={endTour} onSkip={endTour}/>}
+
       {showGoal&&<GoalModal month={month} current={goal} onSave={v=>{onSetTarget(client.id,month,v);setShowGoal(false);}} onClose={()=>setShowGoal(false)}/>}
       {showAdd&&<AddVideoModal month={month} onSave={v=>{onAddVideo({...v,clientId:client.id,workspaceId});setShowAdd(false);}} onClose={()=>setShowAdd(false)}/>}
       {publishDateModal&&(
@@ -779,7 +808,6 @@ function AgencyClientPipeline({client,videos,target,month,workspaceId,userId,use
           </div>
         </div>
       )}
-      {overrideVid&&(<div style={{position:"fixed",inset:0,background:"rgba(15,23,42,.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999,fontFamily:"system-ui"}}><div style={{background:C.surface,borderRadius:16,border:`1px solid ${C.border}`,boxShadow:"0 8px 32px rgba(0,0,0,.2)",width:"min(380px,95vw)",padding:26}}><div style={{fontSize:15,fontWeight:800,color:C.text,marginBottom:6}}>📊 Add metrics early</div><div style={{fontSize:13,color:C.muted,marginBottom:16,lineHeight:1.5}}>If you already have the numbers, go ahead.</div><div style={{display:"flex",gap:8,justifyContent:"flex-end"}}><Btn onClick={()=>setOverrideVid(null)}>Cancel</Btn><button onClick={()=>{setMetricsVid(overrideVid);setOverrideVid(null);}} style={{padding:"8px 16px",background:C.text,color:"#FFF",border:"none",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:700}}>Add metrics now →</button></div></div></div>)}
       {metricsVid&&<MetricsModal video={metricsVid} onSave={m=>{onMetrics(metricsVid.id,m);setMetricsVid(null);}} onClose={()=>setMetricsVid(null)}/>}
       {attachVid&&<AttachVideoModal video={attachVid} onClose={()=>setAttachVid(null)}
         onSave={url=>onMoveVideo(attachVid.id,"review",undefined,{videoUrl:url})}/>}
