@@ -111,13 +111,19 @@ function AgencyOnboarding({user,onComplete,solo}){
           You're all set, {wsName}!
         </div>
         <div style={{fontSize:14,color:C.muted,lineHeight:1.7,marginBottom:28,maxWidth:380,margin:"0 auto 28px"}}>
-          Your workspace is ready. Here's how it works:
+          {solo?"Your board is ready. Here's the loop:":"Your workspace is ready. Here's how it works:"}
         </div>
         <div style={{display:"flex",flexDirection:"column",gap:14,textAlign:"left",marginBottom:32}}>
           {[
-            {n:"1",icon:"🏢",title:"Add your clients from the dashboard",desc:"Each client gets their own pipeline, goal, and progress tracking. Add as many as you need."},
-            {n:"2",icon:"✨",title:"Creative direction per client",desc:"When you add a client, answer a few questions about their brand. The platform uses that to give channel-specific creative directions — not generic suggestions, their voice."},
-            {n:"3",icon:"📊",title:"Track everything from the dashboard",desc:"See all your clients' progress at a glance. Drill into any client for their full pipeline and analytics."},
+            ...(solo?[
+              {n:"1",icon:"🎯",title:"Set your goal for the month",desc:"Decide how many videos you want out. The board fills with slots so you can see the gap at a glance."},
+              {n:"2",icon:"🗂️",title:"Move cards as the work moves",desc:"Idea, Production, Editing, Published. The board is only worth having if it says what is actually true."},
+              {n:"3",icon:"📊",title:"Come back with the numbers",desc:"Once a video is out, add its views. Do that a few times and the app can start telling you what actually works for you."},
+            ]:[
+              {n:"1",icon:"🏢",title:"Add your clients from the dashboard",desc:"Each client gets their own pipeline, goal, and progress tracking. Add as many as you need."},
+              {n:"2",icon:"✨",title:"Creative direction per client",desc:"When you add a client, answer a few questions about their brand. The platform uses that to give channel-specific creative directions — not generic suggestions, their voice."},
+              {n:"3",icon:"📊",title:"Track everything from the dashboard",desc:"See all your clients' progress at a glance. Drill into any client for their full pipeline and analytics."},
+            ]),
           ].map(item=>(
             <div key={item.n} style={{display:"flex",gap:12,alignItems:"flex-start",background:C.light,borderRadius:10,padding:"12px 14px"}}>
               <span style={{fontSize:20,flexShrink:0}}>{item.icon}</span>
