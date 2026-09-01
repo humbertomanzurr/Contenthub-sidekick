@@ -538,13 +538,39 @@ function AgencyClientPipeline({client,videos,target,month,workspaceId,userId,use
   // elements — it teaches by pointing at the thing, not by describing it.
   // Solo plans only: an agency arrives knowing what a pipeline is.
   const tourKey=`sk_tour_${userId}`;
+  // 0 = off, 1..6 = a bubble is showing, -1 = bubble hidden while the user
+  // actually performs the step. tourNext holds where to resume once they do.
+  // Steps 1 and 2 ask for a real action and wait for it; the rest just read.
   const[tourStep,setTourStep]=useState(0);
+  const[tourNext,setTourNext]=useState(null);
   const refGoal=useRef(null), refAdd=useRef(null), refStages=useRef(null), refPublished=useRef(null);
   useEffect(()=>{
     if(!solo)return;
     try{ if(!localStorage.getItem(tourKey)) setTourStep(1); }catch(e){}
   },[solo,tourKey]);
-  const endTour=()=>{ setTourStep(0); try{ localStorage.setItem(tourKey,"done"); }catch(e){} };
+  const endTour=()=>{ setTourStep(0); setTourNext(null); try{ localStorage.setItem(tourKey,"done"); }catch(e){} };
+  const showStep=n=>{ if(n>6)endTour(); else setTourStep(n); };
+  // Called by whatever the user was asked to do. If they closed the modal
+  // without doing it, resumeTour puts the bubble back rather than leaving the
+  // tour stranded at -1 — the original could get stuck that way.
+  const completeTourAction=()=>{ if(tourNext!==null){ showStep(tourNext); setTourNext(null); } };
+  // Functional update, not a read of tourStep. AddVideoModal.save() calls
+  // onSave() and then onClose() in the same handler, so completeTourAction
+  // advanced the step and resumeTour immediately put it back using the stale
+  // value it had closed over. Reading the pending step instead means a resume
+  // can only ever fire when the tour really is still waiting.
+  const resumeTour=()=>setTourStep(cur=>cur===-1?(tourNext!==null?tourNext-1:0):cur);
+  // Self-healing. tourStep -1 means "a modal is open and we are waiting on it".
+  // If no modal is actually open we are stranded: the user dismissed it by a
+  // route that did not call back — Escape, a backdrop click, a close button
+  // added later. Rather than trusting every dismissal path to remember the
+  // tour, notice the impossible state and put the bubble back.
+  useEffect(()=>{
+    if(tourStep!==-1||tourNext===null)return;
+    if(showGoal||showAdd)return;
+    const t=setTimeout(()=>setTourStep(tourNext-1),150);
+    return()=>clearTimeout(t);
+  },[tourStep,tourNext,showGoal,showAdd]);
   const[metricsVid,setMetricsVid]=useState(null);
   const[publishDateModal,setPublishDateModal]=useState(null);
   const[publishDateVal,setPublishDateVal]=useState("");
@@ -587,6 +613,9 @@ function AgencyClientPipeline({client,videos,target,month,workspaceId,userId,use
   const requestReview=v=>setAttachVid(v);
 
   const handleMove=(id,newStage)=>{
+    // Doing the thing beats reading about it: if they publish while the tour
+    // is still explaining publishing, move on.
+    if(tourStep===4&&newStage==="published")showStep(5);
     const vid=(videos||[]).find(x=>x.id===id);
     // Nothing reaches review without a video to review.
     if(newStage==="review"&&vid&&!vid.videoUrl){setAttachVid(vid);return;}
@@ -611,7 +640,7 @@ function AgencyClientPipeline({client,videos,target,month,workspaceId,userId,use
         </div>
         <div style={{display:"flex",gap:7,alignItems:"center"}}>
           <button ref={refGoal} onClick={()=>setShowGoal(true)} style={{padding:"6px 13px",border:`1px solid ${C.border}`,borderRadius:7,background:C.surface,cursor:"pointer",fontSize:12,color:C.muted,fontWeight:600}}>🎯 {goal>0?`${goal} videos`:"Set goal"}</button>
-          <span ref={refAdd}><Btn primary onClick={()=>{setShowAdd(true);if(tourStep===2)setTourStep(3);}}>+ Add idea</Btn></span>
+          <span ref={refAdd}><Btn primary onClick={()=>{setShowAdd(true);if(tourStep===2){setTourStep(-1);setTourNext(3);}}}>+ Add idea</Btn></span>
         </div>
       </div>
 
@@ -769,12 +798,12 @@ function AgencyClientPipeline({client,videos,target,month,workspaceId,userId,use
       {solo&&tourStep===1&&<TourBubble step={1} total={6} emoji="🎯" targetRef={refGoal}
         title="Start with a number"
         body="Decide how many videos you want out this month. It is the one number the whole board is measured against, and it fills your pipeline with slots to fill."
-        action="Set my goal →" onAction={()=>{setShowGoal(true);setTourStep(2);}} onSkip={endTour}/>}
+        action="Set my goal →" onAction={()=>{setTourStep(-1);setTourNext(2);setShowGoal(true);}} onSkip={endTour}/>}
 
       {solo&&tourStep===2&&<TourBubble step={2} total={6} emoji="➕" targetRef={refAdd}
         title="Add your first idea"
         body="Think of one video you want to make this week. It does not have to be good yet — a working title is enough. You can rename it any time."
-        action="Got it →" onAction={()=>setTourStep(3)} onSkip={endTour}/>}
+        action="Add a video →" onAction={()=>{setTourStep(-1);setTourNext(3);setShowAdd(true);}} onSkip={endTour}/>}
 
       {solo&&tourStep===3&&<TourBubble step={3} total={6} emoji="🚀" targetRef={refStages} side="top"
         title="Drag it as you go"
@@ -796,8 +825,8 @@ function AgencyClientPipeline({client,videos,target,month,workspaceId,userId,use
         body="Plan, make, publish, record what happened. Do it a few times and the app can start telling you which openings and formats actually work for you — that part comes with Business."
         action="Let me at it →" onAction={endTour} onSkip={endTour}/>}
 
-      {showGoal&&<GoalModal month={month} current={goal} onSave={v=>{onSetTarget(client.id,month,v);setShowGoal(false);}} onClose={()=>setShowGoal(false)}/>}
-      {showAdd&&<AddVideoModal month={month} onSave={v=>{onAddVideo({...v,clientId:client.id,workspaceId});setShowAdd(false);}} onClose={()=>setShowAdd(false)}/>}
+      {showGoal&&<GoalModal month={month} current={goal} onSave={v=>{onSetTarget(client.id,month,v);setShowGoal(false);completeTourAction();}} onClose={()=>{setShowGoal(false);resumeTour();}}/>}
+      {showAdd&&<AddVideoModal month={month} onSave={v=>{onAddVideo({...v,clientId:client.id,workspaceId});setShowAdd(false);completeTourAction();}} onClose={()=>{setShowAdd(false);resumeTour();}}/>}
       {publishDateModal&&(
         <div style={{position:"fixed",inset:0,background:"rgba(15,23,42,.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999,fontFamily:"system-ui"}}>
           <div style={{background:C.surface,borderRadius:16,border:`1px solid ${C.border}`,boxShadow:"0 8px 32px rgba(0,0,0,.2)",width:"min(380px,95vw)",padding:26}}>
