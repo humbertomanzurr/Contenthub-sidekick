@@ -762,7 +762,7 @@ function AgencyClientPipeline({client,videos,target,month,workspaceId,userId,use
                           </button>
                         )}
                         {stage.id==="approved"&&<button onClick={()=>handleMove(v.id,"published")} style={{fontSize:10,padding:"5px 11px",background:BRAND.green,border:"none",borderRadius:20,cursor:"pointer",color:"#FFF",fontWeight:600}}>Publish →</button>}
-                        {stage.id==="editing"&&<button onClick={()=>requestReview(v)} style={{fontSize:10,padding:"5px 11px",background:C.surface,border:`1px solid ${C.border}`,borderRadius:20,cursor:"pointer",color:C.text,fontWeight:500}}>{v.videoUrl?"Send for review →":"Attach video →"}</button>}
+                        {stage.id==="editing"&&!solo&&<button onClick={()=>requestReview(v)} style={{fontSize:10,padding:"5px 11px",background:C.surface,border:`1px solid ${C.border}`,borderRadius:20,cursor:"pointer",color:C.text,fontWeight:500}}>{v.videoUrl?"Send for review →":"Attach video →"}</button>}
                         {isPub&&!hasMet&&<button onClick={()=>canAnalytics
                           ?setMetricsVid(v)
                           :onUpsell&&onUpsell({title:"Tracking results is part of Business",
@@ -787,7 +787,7 @@ function AgencyClientPipeline({client,videos,target,month,workspaceId,userId,use
                             {v.script?(()=>{try{const p=JSON.parse(v.script);const wc=Object.values(p).join(" ").trim().split(/\s+/).filter(Boolean).length;return wc>0?`Script · ${wc} words`:"Script written";}catch(e){return"Script written";}})():"Write your script"}
                           </button>
                         )}
-                        {stage.id==="production"&&(
+                        {false&&stage.id==="production"&&(
                           <button onClick={()=>setShootCard(v)}
                             style={{width:"100%",padding:"7px 0",borderRadius:7,border:`1.5px solid ${v.shootPlan?BRAND.yellow:C.border}`,background:v.shootPlan?BRAND.yellow+"18":C.light,cursor:"pointer",fontSize:11,fontWeight:600,color:v.shootPlan?"#8A6D00":C.muted,display:"flex",alignItems:"center",justifyContent:"center",gap:6,transition:"all .15s"}}
                             onMouseEnter={e=>{e.currentTarget.style.borderColor=BRAND.yellow;e.currentTarget.style.background=BRAND.yellow+"22";e.currentTarget.style.color="#8A6D00";}}
