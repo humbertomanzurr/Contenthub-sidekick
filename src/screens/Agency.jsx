@@ -649,7 +649,9 @@ function AgencyClientPipeline({client,videos,target,month,workspaceId,userId,use
     <div>
       {/* Header */}
       <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:16,flexWrap:"wrap"}}>
+        {!solo&&(
         <button onClick={onBack} style={{background:"none",border:`1px solid ${C.border}`,borderRadius:8,padding:"5px 10px",cursor:"pointer",fontSize:12,color:C.muted}}>← All clients</button>
+        )}
         <div style={{display:"flex",alignItems:"center",gap:8,flex:1}}>
           <span style={{fontSize:22}}>{client.emoji||"🏢"}</span>
           <div style={{fontSize:17,fontWeight:800,color:C.text}}>{client.name}</div>
