@@ -147,35 +147,58 @@ const PLANS = [
     id: "free",
     accent: BRAND.green,
     eyebrow: "Free",
-    title: "One client, one seat",
-    lead: "The whole product, not a crippled preview. Everything a solo marketer needs to run one brand properly.",
+    price: "$0",
+    per: "forever",
+    title: "One brand, ten cards",
+    lead: "The real product, not a demo. Everything you need to run one brand's content properly.",
     points: [
-      "Full six-stage pipeline",
+      "Pipeline from brief to published",
       "Review room with timestamped notes",
-      "Calendar and monthly goals",
-      "Script document and shoot planner",
-      "Performance analytics",
+      "Script writing with AI questions",
+      "Shoot planner and call sheet",
+      "10 cards in progress at a time",
     ],
-    limit: "Limited to one client and one user.",
+    limit: "Published cards don't count towards the ten — so the pipeline keeps working. You'll know you've outgrown it when you're deleting cards to make room.",
     cta: "Start free",
     solid: false,
   },
   {
-    id: "agency",
+    id: "business",
     accent: BRAND.blue,
-    eyebrow: "Agency",
-    title: "Every client, your whole team",
-    lead: "The same app, without the ceiling. For when you take on a second client, or hire someone.",
+    eyebrow: "Business",
+    price: "$30",
+    per: "per month",
+    title: "One brand, no ceiling",
+    lead: "For one brand run seriously — when you want to know what's working, not just what's shipped.",
     points: [
-      "Everything in Free",
-      "Unlimited clients",
-      "Unlimited team members, with roles",
-      "Creator scouting and shortlists",
-      "Printable client reports",
+      "Everything in Free, uncapped",
+      "Analytics on your own posts",
+      "Creator search and shortlists",
+      "Up to 3 people",
+      "Printable reports",
     ],
-    limit: "Pricing announced soon — start free and upgrade when you outgrow it.",
-    cta: "Start free, upgrade later",
+    limit: "The step most people take first. Same app, same data — the limits just come off.",
+    cta: "Start free, upgrade inside",
     solid: true,
+  },
+  {
+    id: "agency",
+    accent: C.purple,
+    eyebrow: "Agency",
+    price: "Let's talk",
+    per: "",
+    title: "Every client, your whole team",
+    lead: "When one brand becomes several and you need roles, approvals and per-client reporting.",
+    points: [
+      "Everything in Business",
+      "Unlimited clients",
+      "Unlimited team, with roles",
+      "Per-client pipelines and reports",
+      "Agency-wide calendar",
+    ],
+    limit: "Nothing to migrate when you get here — Free, Business and Agency are the same app with different ceilings.",
+    cta: "Start free",
+    solid: false,
   },
 ];
 
@@ -220,26 +243,26 @@ function Landing({ onPath }) {
           <div style={{ display: "flex", gap: 4 }}>
             {[BRAND.red, BRAND.yellow, BRAND.blue, BRAND.green].map((c, i) => <div key={i} style={{ width: 7, height: 7, borderRadius: "50%", background: c }} />)}
           </div>
-          Built for content agencies
+          For content agencies
         </div>
 
         <div style={{ fontSize: 42, fontWeight: 500, lineHeight: 1.14, letterSpacing: -1.2, color: "#111", marginBottom: 18 }}>
-          Run every client's content<br />
-          like you run{" "}
-          <span style={{ color: BRAND.red }}>your</span>{" "}
-          <span style={{ color: BRAND.blue }}>best</span>{" "}
-          <span style={{ color: BRAND.green }}>one.</span>
+          Know where every video is.<br />
+          For{" "}
+          <span style={{ color: BRAND.red }}>every</span>{" "}
+          <span style={{ color: BRAND.blue }}>single</span>{" "}
+          <span style={{ color: BRAND.green }}>client.</span>
         </div>
 
         <div style={{ fontSize: 15.5, color: "#555", lineHeight: 1.7, maxWidth: 520, margin: "0 auto 30px" }}>
-          Pipelines, review, scouting and reporting for agencies juggling more brands than spreadsheets can hold. Start with one client for free — the same app, all the way up.
+          A board that runs brief to published, a review room where notes pin to the exact second of the cut, and reports a client can actually read. For agencies who outgrew the spreadsheet.
         </div>
 
         <div style={{ display: "flex", gap: 10, justifyContent: "center", marginBottom: 14, flexWrap: "wrap" }}>
           <button onClick={() => onPath("free")} style={{ padding: "12px 28px", background: "#111", color: "white", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 500, cursor: "pointer" }}>Start free →</button>
           <button onClick={() => document.getElementById("pillars")?.scrollIntoView({ behavior: "smooth" })} style={{ padding: "12px 20px", background: "none", color: "#111", border: "1px solid #DDD", borderRadius: 8, fontSize: 14, cursor: "pointer" }}>See what it does</button>
         </div>
-        <div style={{ fontSize: 11, color: "#AAA" }}>No card. One client free, forever.</div>
+        <div style={{ fontSize: 11, color: "#AAA" }}>Free for one brand, forever. No card.</div>
       </div>
 
       {/* Pillars — click one, look at it. */}
@@ -301,20 +324,24 @@ function Landing({ onPath }) {
       <div style={{ borderTop: "0.5px solid #E8E8E8", background: "#FCFCFD", padding: "56px 32px 72px" }}>
         <div style={{ maxWidth: 860, margin: "0 auto" }}>
           <div style={{ textAlign: "center", marginBottom: 30 }}>
-            <div style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: 1, color: "#AAA", marginBottom: 8 }}>Two ways in</div>
-            <div style={{ fontSize: 24, fontWeight: 500, color: "#111", letterSpacing: -0.5, marginBottom: 10 }}>Same app. One of them has a ceiling.</div>
+            <div style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: 1, color: "#AAA", marginBottom: 8 }}>Pricing</div>
+            <div style={{ fontSize: 24, fontWeight: 500, color: "#111", letterSpacing: -0.5, marginBottom: 10 }}>Same app three times. Only the ceiling moves.</div>
             <div style={{ fontSize: 13.5, color: "#666", lineHeight: 1.65, maxWidth: 500, margin: "0 auto" }}>
-              There's no stripped-down version to graduate out of. You start on the real thing and lift the limit when your work outgrows it.
+              Nothing to migrate and nothing to relearn when you move up — your board, your cards and your history stay exactly where they are. You're only ever buying room.
             </div>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: narrow ? "1fr" : "1fr 1fr", gap: 16 }}>
+          <div style={{ display: "grid", gridTemplateColumns: narrow ? "1fr" : "repeat(3,1fr)", gap: 14 }}>
             {PLANS.map(p => (
               <div key={p.id} style={{ background: "#FFF", border: `0.5px solid ${p.solid ? "#D8E4F2" : "#E8E8E8"}`, borderRadius: 14, overflow: "hidden", display: "flex", flexDirection: "column", boxShadow: p.solid ? "0 2px 14px rgba(55,138,221,.09)" : "none" }}>
                 <div style={{ height: 3, background: p.accent }} />
                 <div style={{ padding: 26, display: "flex", flexDirection: "column", flex: 1 }}>
-                  <div style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: 1, color: p.accent, marginBottom: 10 }}>{p.eyebrow}</div>
-                  <div style={{ fontSize: 18, fontWeight: 500, color: "#111", letterSpacing: -0.3, marginBottom: 8 }}>{p.title}</div>
+                  <div style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: 1, color: p.accent, marginBottom: 8 }}>{p.eyebrow}</div>
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginBottom: 8 }}>
+                    <span style={{ fontSize: 26, fontWeight: 600, color: "#111", letterSpacing: -0.8 }}>{p.price}</span>
+                    {p.per && <span style={{ fontSize: 12, color: "#999" }}>{p.per}</span>}
+                  </div>
+                  <div style={{ fontSize: 15, fontWeight: 500, color: "#111", letterSpacing: -0.2, marginBottom: 8 }}>{p.title}</div>
                   <div style={{ fontSize: 13, color: "#666", lineHeight: 1.6, marginBottom: 18 }}>{p.lead}</div>
 
                   <div style={{ display: "flex", flexDirection: "column", gap: 8, flex: 1, marginBottom: 18 }}>
