@@ -955,22 +955,6 @@ function AgencyApp({user,profile,onLogout}){
   // identical to an agency's — upgrading is a flag, not a migration — but the
   // UI never says "client", because a solo marketer does not think of their own
   // brand as one. Create it on first run, then drop straight into its pipeline.
-  // Guarded by a ref, not by state: addClient's identity changes whenever
-  // `clients` does, so the effect re-runs on every list change. If a create
-  // ever failed and rolled the optimistic row back, the list would return to
-  // empty and this would retry forever. One attempt per session is enough —
-  // a failure surfaces through clientError like any other.
-  const autoBrand=useRef(false);
-  useEffect(()=>{
-    if(!solo||loading||needsOnboarding||!wsId)return;
-    if(clients.length===0){
-      if(autoBrand.current)return;
-      autoBrand.current=true;
-      addClient(wsName||"Mi marca","🏪");
-      return;
-    }
-    if(!selectedClient)setSelectedClient(clients[0]);
-  },[solo,loading,needsOnboarding,wsId,clients,selectedClient,wsName,addClient]);
   useEffect(()=>{const p=setInterval(load,60000);return()=>clearInterval(p);},[load]);
 
   const handleOnboardingComplete=async(newWsId)=>{setWsId(newWsId);setNeedsOnboarding(false);await load();};
@@ -998,6 +982,23 @@ function AgencyApp({user,profile,onLogout}){
     load(); // refresh in the background; the caller shouldn't wait on it
     return newClient;
   },[wsId,load,clients,plan]);
+
+  // Guarded by a ref, not by state: addClient's identity changes whenever
+  // `clients` does, so the effect re-runs on every list change. If a create
+  // ever failed and rolled the optimistic row back, the list would return to
+  // empty and this would retry forever. One attempt per session is enough —
+  // a failure surfaces through clientError like any other.
+  const autoBrand=useRef(false);
+  useEffect(()=>{
+    if(!solo||loading||needsOnboarding||!wsId)return;
+    if(clients.length===0){
+      if(autoBrand.current)return;
+      autoBrand.current=true;
+      addClient(wsName||"Mi marca","🏪");
+      return;
+    }
+    if(!selectedClient)setSelectedClient(clients[0]);
+  },[solo,loading,needsOnboarding,wsId,clients,selectedClient,wsName,addClient]);
 
   const addVideo=useCallback(async(v)=>{
     // Checked here rather than in the modal so every route to a new card goes
