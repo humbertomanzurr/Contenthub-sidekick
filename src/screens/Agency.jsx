@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AGENCY_STAGES, CLIENT_QUESTIONS } from "../data/constants";
 import { addMonths, curMonth, daysSince, fmt, monthLabel, uuid } from "../lib/format";
 import { createWorkspace, getNotes, getWorkspaceMember, sbDelete, sbGetWhere, sbInsert, sbInsertX, sbUpdate, sbUpsert } from "../lib/supabase";
 import { AgencyAnalytics } from "./AgencyAnalytics";
 import { SettingsPage } from "./Settings";
+import { PLANS, cardLimitReason, isSolo, planOf } from "../lib/plan";
 import { AttachVideoModal, NotesPanel, ReviewRoom } from "./AgencyReview";
 import { AddVideoModal, GoalModal, MetricsModal } from "./Business";
 import { CampaignCreator } from "./Campaigns";
@@ -11,7 +12,7 @@ import { ScriptDocument } from "./Script";
 import { ShootPlanner } from "./Shoot";
 import { AIBoxIcon, BRAND, Btn, C, Card, Logo, PlatformIcon, inp, sh, shMd } from "../ui/theme";
 
-function AgencyOnboarding({user,onComplete}){
+function AgencyOnboarding({user,onComplete,solo}){
   const[step,setStep]=useState(0);
   const[wsName,setWsName]=useState("");
   const[loading,setLoading]=useState(false);
@@ -63,10 +64,12 @@ function AgencyOnboarding({user,onComplete}){
         </div>
         <div style={{fontSize:11,fontWeight:600,color:C.accent,letterSpacing:0.5,marginBottom:8}}>1 of 1</div>
         <div style={{fontSize:20,fontWeight:800,color:C.text,marginBottom:6,letterSpacing:-0.3}}>
-          What is your agency called?
+          {solo?"What is your brand called?":"What is your agency called?"}
         </div>
         <div style={{fontSize:13,color:C.muted,marginBottom:22,lineHeight:1.5}}>
-          This becomes your workspace name. Your team will see it when they join.
+          {solo
+            ?"We'll set up your pipeline under this name. You can change it later."
+            :"This becomes your workspace name. Your team will see it when they join."}
         </div>
         <input
           autoFocus
@@ -851,6 +854,47 @@ function AgencyBrainstorm({clients,videos,userId,month,onSendToPipeline}){
   );
 }
 
+
+// Shown when a ceiling is reached or a locked tab is opened. It states the
+// limit, why it exists, and what upgrading changes — a paywall that does not
+// explain itself reads as the product being broken.
+function UpgradeSheet({reason,onClose}){
+  if(!reason)return null;
+  return(
+    <div onClick={onClose} style={{position:"fixed",inset:0,background:"rgba(15,23,42,.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999,padding:14}}>
+      <div onClick={e=>e.stopPropagation()} style={{background:C.surface,borderRadius:16,border:`1px solid ${C.border}`,boxShadow:shMd,width:"min(420px,95vw)",overflow:"hidden"}}>
+        <div style={{display:"flex",height:3}}>
+          {[BRAND.red,BRAND.yellow,BRAND.blue,BRAND.green].map((c,i)=><div key={i} style={{flex:1,background:c}}/>)}
+        </div>
+        <div style={{padding:24}}>
+          <div style={{fontSize:9,fontWeight:600,color:C.muted,letterSpacing:1,textTransform:"uppercase",marginBottom:6}}>Business · $30/mo</div>
+          <div style={{fontSize:17,fontWeight:600,color:C.text,letterSpacing:-0.2,marginBottom:8}}>{reason.title}</div>
+          <div style={{fontSize:13,color:C.muted,lineHeight:1.6,marginBottom:16}}>{reason.body}</div>
+          {reason.used!==undefined&&(
+            <div style={{background:C.light,borderRadius:10,padding:"10px 12px",marginBottom:16,fontSize:12,color:C.text}}>
+              {reason.used} of {reason.limit} cards in progress · published cards don't count
+            </div>
+          )}
+          <div style={{display:"flex",flexDirection:"column",gap:7,marginBottom:18}}>
+            {["Unlimited cards in your pipeline","Analytics for your own posts","Talent search and shortlists","Up to 3 people on your team"].map(f=>(
+              <div key={f} style={{display:"flex",gap:8,fontSize:12.5,color:C.text}}>
+                <span style={{color:C.green,fontWeight:700}}>✓</span>{f}
+              </div>
+            ))}
+          </div>
+          <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
+            <Btn onClick={onClose}>Not yet</Btn>
+            <Btn primary onClick={onClose}>Upgrade to Business</Btn>
+          </div>
+          <div style={{fontSize:11,color:C.muted,marginTop:10,textAlign:"center"}}>
+            Billing isn't connected yet — this button does nothing so far.
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AgencyApp({user,profile,onLogout}){
   const[clientError,setClientError]=useState(null);
   const[clients,setClients]=useState([]);
@@ -865,6 +909,12 @@ function AgencyApp({user,profile,onLogout}){
   const[loading,setLoading]=useState(true);
   const[needsOnboarding,setNeedsOnboarding]=useState(false);
   const[wsId,setWsId]=useState(null);
+  // One component serves every tier. Forking it into a separate "business
+  // portal" is what let the old one rot: this repo still carries two copies of
+  // AddVideoModal, MetricsModal and GoalModal for exactly that reason.
+  const plan=planOf(profile,user.id);
+  const solo=isSolo(plan);
+  const[upsell,setUpsell]=useState(null);
 
   const load=useCallback(async()=>{
     try{
@@ -900,12 +950,40 @@ function AgencyApp({user,profile,onLogout}){
   },[user.id]);
 
   useEffect(()=>{load();},[load]);
+
+  // A solo account has one brand. It exists as a client row so the schema is
+  // identical to an agency's — upgrading is a flag, not a migration — but the
+  // UI never says "client", because a solo marketer does not think of their own
+  // brand as one. Create it on first run, then drop straight into its pipeline.
+  // Guarded by a ref, not by state: addClient's identity changes whenever
+  // `clients` does, so the effect re-runs on every list change. If a create
+  // ever failed and rolled the optimistic row back, the list would return to
+  // empty and this would retry forever. One attempt per session is enough —
+  // a failure surfaces through clientError like any other.
+  const autoBrand=useRef(false);
+  useEffect(()=>{
+    if(!solo||loading||needsOnboarding||!wsId)return;
+    if(clients.length===0){
+      if(autoBrand.current)return;
+      autoBrand.current=true;
+      addClient(wsName||"Mi marca","🏪");
+      return;
+    }
+    if(!selectedClient)setSelectedClient(clients[0]);
+  },[solo,loading,needsOnboarding,wsId,clients,selectedClient,wsName,addClient]);
   useEffect(()=>{const p=setInterval(load,60000);return()=>clearInterval(p);},[load]);
 
   const handleOnboardingComplete=async(newWsId)=>{setWsId(newWsId);setNeedsOnboarding(false);await load();};
 
   const addClient=useCallback(async(name,emoji)=>{
     setClientError(null);
+    // The first brand is created for a solo account automatically; a second is
+    // what the Agency tier is for.
+    if(clients.length>=plan.clients){
+      setUpsell({title:"One brand on this plan",
+        body:"Agency lifts the limit on clients and lets you invite your whole team. Everything you have built stays where it is."});
+      return null;
+    }
     const id=uuid();
     const newClient={id,name,emoji,workspace_id:wsId,client_profile:null};
     setClients(prev=>[...prev,newClient]);
@@ -919,14 +997,18 @@ function AgencyApp({user,profile,onLogout}){
     setClientError(null);
     load(); // refresh in the background; the caller shouldn't wait on it
     return newClient;
-  },[wsId,load]);
+  },[wsId,load,clients,plan]);
 
   const addVideo=useCallback(async(v)=>{
+    // Checked here rather than in the modal so every route to a new card goes
+    // through it. Refusing with a reason, never silently.
+    const blocked=cardLimitReason(plan,videos);
+    if(blocked){setUpsell(blocked);return;}
     const newV={id:v.id,clientId:v.clientId,workspaceId:wsId,title:v.title,platform:v.platform||"TikTok",stage:"idea",targetDate:v.targetDate||null,publishDate:null,url:"",hook:"",format:"",cta:"",views:0,likes:0,comments:0,shares:0,saves:0,paraTi:null,siguiendo:null,busqueda:null,metricsAdded:false,script:"",shotList:"",editAdvice:"",month:v.month||month,createdAt:new Date().toISOString()};
     setVideos(prev=>[newV,...prev]);
     await sbInsert("agency_videos",{id:v.id,workspace_id:wsId,client_id:v.clientId,title:v.title,platform:v.platform||"TikTok",stage:"idea",target_date:v.targetDate||null,publish_date:null,url:"",hook:"",format:"",cta:"",views:0,likes:0,comments:0,shares:0,saves:0,para_ti:null,siguiendo:null,busqueda:null,metrics_added:false,script:"",shot_list:"",edit_advice:"",month:v.month||month,created_at:new Date().toISOString()});
     await load();
-  },[wsId,month,load]);
+  },[wsId,month,load,plan,videos]);
 
   const moveVideo=useCallback(async(id,st,pd,opts)=>{
     const pubD=pd||(st==="published"?new Date().toISOString().slice(0,10):undefined);
@@ -976,8 +1058,8 @@ function AgencyApp({user,profile,onLogout}){
     await sbUpsert("agency_targets",{workspace_id:wsId,client_id:clientId,month:mo,goal},"workspace_id,client_id,month");
   },[wsId]);
 
-  if(loading)return(<div style={{minHeight:"100vh",background:C.bg,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"system-ui"}}><div style={{textAlign:"center"}}><div style={{fontSize:20,fontWeight:800,color:C.text}}>ContentHub Sidekick</div><div style={{fontSize:12,color:C.muted,marginTop:5}}>Loading your agency...</div></div></div>);
-  if(needsOnboarding)return<AgencyOnboarding user={user} onComplete={handleOnboardingComplete}/>;
+  if(loading)return(<div style={{minHeight:"100vh",background:C.bg,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"system-ui"}}><div style={{textAlign:"center"}}><div style={{fontSize:20,fontWeight:800,color:C.text}}>ContentHub Sidekick</div><div style={{fontSize:12,color:C.muted,marginTop:5}}>{solo?"Setting up your pipeline…":"Loading your agency…"}</div></div></div>);
+  if(needsOnboarding)return<AgencyOnboarding user={user} solo={solo} onComplete={handleOnboardingComplete}/>;
 
   const clientVids=selectedClient?videos.filter(v=>v.clientId===selectedClient.id):[];
   const clientTarget=selectedClient?targets.find(t=>t.client_id===selectedClient.id&&t.month===month):null;
@@ -987,12 +1069,21 @@ function AgencyApp({user,profile,onLogout}){
       <div style={{background:C.surface,borderBottom:`1px solid ${C.border}`,padding:"0 20px",height:50,display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0,boxShadow:sh}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <div style={{display:"flex",alignItems:"center",gap:8}}><Logo/><div style={{fontSize:14,fontWeight:500,color:"#111",letterSpacing:-0.2}}>ContentHub <span style={{fontWeight:400,color:"#888",fontSize:13}}>Sidekick</span></div></div>
-          <span style={{background:"#EDE9FE",color:"#7C3AED",fontSize:9,fontWeight:700,padding:"2px 7px",borderRadius:20}}>Agency</span>
-          {selectedClient&&<div style={{display:"flex",alignItems:"center",gap:6,marginLeft:8}}><span style={{color:C.muted,fontSize:12}}>›</span><span style={{fontSize:13,fontWeight:600,color:C.text}}>{selectedClient.emoji} {selectedClient.name}</span></div>}
+          <span style={{background:"#EDE9FE",color:"#7C3AED",fontSize:9,fontWeight:700,padding:"2px 7px",borderRadius:20}}>{plan.label}</span>
+          {selectedClient&&!solo&&<div style={{display:"flex",alignItems:"center",gap:6,marginLeft:8}}><span style={{color:C.muted,fontSize:12}}>›</span><span style={{fontSize:13,fontWeight:600,color:C.text}}>{selectedClient.emoji} {selectedClient.name}</span></div>}
         </div>
         <div style={{display:"flex",alignItems:"center",gap:3}}>
-          {[["dashboard","Dashboard"],["brainstorm","Brainstorm"],["analytics","Analytics"]].map(([id,label])=>(
-            <button key={id} onClick={()=>{setPage(id);setSelectedClient(null);}}
+          {(solo
+              ?[["dashboard","Pipeline"],["analytics","Analytics",!plan.analytics],["brainstorm","Talent",!plan.talent]]
+              :[["dashboard","Dashboard"],["brainstorm","Brainstorm"],["analytics","Analytics"]]
+            ).map(([id,label,locked])=>(
+            locked
+            ?<button key={id} onClick={()=>setUpsell({locked:label,title:`${label} is part of Business`,body:`Upgrade to see ${label.toLowerCase()} for your brand. Everything you have built stays exactly where it is.`})}
+               style={{padding:"5px 12px",border:"none",cursor:"pointer",fontSize:12,fontWeight:400,color:C.muted,background:"transparent",borderRadius:7,display:"inline-flex",alignItems:"center",gap:5}}>
+               {label}<span style={{fontSize:9}}>🔒</span>
+             </button>
+            :
+            <button key={id} onClick={()=>{setPage(id);setSelectedClient(solo?(clients[0]||null):null);}}
               style={{padding:"5px 12px",border:"none",cursor:"pointer",fontSize:12,fontWeight:page===id&&!selectedClient?600:400,color:page===id&&!selectedClient?C.text:C.muted,background:page===id&&!selectedClient?C.light:"transparent",borderRadius:7}}>{label}</button>
           ))}
         </div>
@@ -1034,6 +1125,7 @@ function AgencyApp({user,profile,onLogout}){
           )}
         </div>
       </div>
+      <UpgradeSheet reason={upsell} onClose={()=>setUpsell(null)}/>
       <div style={{flex:1,overflowY:"auto",padding:20}}>
         {selectedClient
           ?<AgencyClientPipeline client={selectedClient} videos={clientVids} target={clientTarget} month={month} workspaceId={wsId} userId={user.id} userName={profile?.name||user.email} onAddVideo={addVideo} onMoveVideo={moveVideo} onMetrics={saveMetrics} onDeleteVideo={deleteVideo} onSetTarget={setTarget} onSaveScript={saveScript} onSaveShoot={saveShoot} onBack={()=>setSelectedClient(null)}/>

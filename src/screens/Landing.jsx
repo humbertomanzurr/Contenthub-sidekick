@@ -384,7 +384,17 @@ function AuthScreen({ path, onLogin, onBack }) {
         // default account_type. Overwrite it with the portal they belong in.
         console.warn("profiles insert skipped, patching instead:", pr.error);
       }
+      // account_type stays "agency" because both tiers run the same portal —
+      // the plan is what differs. Written to the row as well as localStorage:
+      // localStorage is per-device, so without the column a signup on one
+      // browser would look like a different tier on another.
       await sbUpdate("profiles", "id", u2.id, { account_type: "agency" });
+      const chosenPlan = path === "agency" ? "agency" : "free";
+      const planWrite = await sbUpdate("profiles", "id", u2.id, { plan: chosenPlan });
+      if (planWrite && !planWrite.ok) {
+        // The column may not exist yet; localStorage carries it until it does.
+        console.warn("profiles.plan not written — run security/plan.sql:", planWrite.error);
+      }
       setPendingUser({ user: u2, profile: { name, account_type: "agency" } });
       setLoading(false);
       return;
