@@ -8,6 +8,30 @@ let _token = null;
 
 const _h = (x={}) => ({"apikey":SB_KEY,"Content-Type":"application/json","Authorization":`Bearer ${_token||SB_KEY}`,...x});
 
+// ── ERROR VISIBILITY ─────────────────────────────────────────────────────────
+// A request that failed must never be indistinguishable from one that found
+// nothing. sbGetWhere already calls these; they lived only on an unmerged
+// branch, so on main they were a ReferenceError waiting for the first failure.
+let _lastError = null;
+const sbLastError = () => _lastError;
+
+const _note = (t,op,status,message) => {
+  _lastError = {table:t,op,status,message:String(message).slice(0,200),at:new Date().toISOString()};
+  console.error(`[supabase] ${op} ${t} failed:`,status,message);
+  return _lastError;
+};
+
+const _bad = async (t,op,r) => {
+  const raw = await r.text().catch(()=>"");
+  let msg = raw;
+  try { const j=JSON.parse(raw); msg=j.message||j.hint||j.details||raw; } catch(e){}
+  if(r.status===401||r.status===403) msg=`${msg} (session may have expired — sign out and back in)`;
+  return _note(t,op,r.status,msg);
+};
+
+const _net = (t,op,e) => _note(t,op,0,(e&&e.message)||"Network error");
+
+
 // The /api/chat endpoint spends real money on every call, so it has to know
 // who is asking. This is the same Supabase session token every database
 // request already carries — the endpoint verifies it before doing any work.
@@ -128,4 +152,4 @@ const getWorkspaceMember = async (userId) => {
 
 // ── AGENCY ONBOARDING ─────────────────────────────────────────────────────────
 
-export { sbGetWhere, aiHeaders, sbSessionSync, SB_KEY, SB_URL, _h, _token, addNote, createWorkspace, getNotes, getWorkspaceMember, sbDelete, sbGet, sbGetOne, sbGetSession, sbInsert, sbInsertX, sbSignIn, sbSignOut, sbSignUp, sbUpdate, sbUpsert };
+export { sbLastError, sbGetWhere, aiHeaders, sbSessionSync, SB_KEY, SB_URL, _h, _token, addNote, createWorkspace, getNotes, getWorkspaceMember, sbDelete, sbGet, sbGetOne, sbGetSession, sbInsert, sbInsertX, sbSignIn, sbSignOut, sbSignUp, sbUpdate, sbUpsert };
