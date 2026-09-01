@@ -29,16 +29,26 @@ function AgencyOnboarding({user,onComplete,solo}){
   if(step===0)return(
     <div style={{minHeight:"100vh",background:C.bg,fontFamily:"system-ui,sans-serif",display:"flex",alignItems:"center",justifyContent:"center",padding:24}}>
       <div style={{width:"min(500px,100%)",background:C.surface,borderRadius:20,border:`1px solid ${C.border}`,boxShadow:shMd,padding:"40px 36px",textAlign:"center"}}>
-        <div style={{fontSize:44,marginBottom:16}}>🏛️</div>
-        <div style={{fontSize:24,fontWeight:900,color:C.text,letterSpacing:-0.5,marginBottom:10,lineHeight:1.2}}>Welcome to Sidekick Agency</div>
+        <div style={{fontSize:44,marginBottom:16}}>{solo?"🏪":"🏛️"}</div>
+        <div style={{fontSize:24,fontWeight:900,color:C.text,letterSpacing:-0.5,marginBottom:10,lineHeight:1.2}}>
+          {solo?"Welcome to ContentHub":"Welcome to Sidekick Agency"}
+        </div>
         <div style={{fontSize:14,color:C.muted,lineHeight:1.7,marginBottom:24,maxWidth:380,margin:"0 auto 24px"}}>
-          Manage content pipelines for all your clients in one place. Every client gets their own board, targets, and creative direction tailored to their brand.
+          {solo
+            ?"Everything you make for your brand, in one place — planned, filmed, published, and measured. Nothing here posts for you and nothing writes for you."
+            :"Manage content pipelines for all your clients in one place. Every client gets their own board, targets, and creative direction tailored to their brand."}
         </div>
         <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:32,textAlign:"left",background:C.light,borderRadius:12,padding:"16px 18px"}}>
           {[
-            ["🗂️","One pipeline per client","Idea → Production → Editing → Review → Published"],
-            ["📊","Big picture dashboard","Monthly targets and health across all clients"],
-            ["✨","Tailored creative direction","Channel-specific guidance based on each client's brand and analytics"],
+            ...(solo?[
+              ["🗂️","One board for your brand","Idea → Production → Editing → Published"],
+              ["🎯","A goal you can see","How many videos this month, and how close you are"],
+              ["✨","Questions, not answers","The AI helps you think it through. You write it."],
+            ]:[
+              ["🗂️","One pipeline per client","Idea → Production → Editing → Review → Approved → Published"],
+              ["📊","Big picture dashboard","Monthly targets and health across all clients"],
+              ["✨","Tailored creative direction","Channel-specific guidance based on each client's brand and analytics"],
+            ]),
           ].map(([e,t,d])=>(
             <div key={t} style={{display:"flex",alignItems:"center",gap:10}}>
               <span style={{fontSize:18}}>{e}</span>
