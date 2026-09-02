@@ -214,28 +214,45 @@ export default async function handler(req, res) {
       .map(b => (b.content && !Array.isArray(b.content) && b.content.error_code) || null)
       .filter(Boolean);
 
-    // Record what this cost. Fire-and-forget on purpose: a logging failure must
-    // never turn a good answer into an error, and must never add latency to it.
-    // Raw counts only — rates change, and a stored dollar figure goes stale
-    // with no way to recompute it.
+    // Record what this cost. Awaited, not fire-and-forget: this runs on Vercel,
+    // where the function is frozen the moment the response is sent, so an
+    // in-flight request that has not resolved is simply dropped. That is why
+    // the first version of this logged nothing at all. The abort keeps a slow
+    // or broken database from ever hanging a good answer, and a failure is
+    // logged rather than swallowed — silent logging is worse than none, because
+    // an empty table reads as "nothing happened" instead of "this is broken".
+    // Raw counts only: rates change, and a stored dollar figure goes stale with
+    // no way to recompute it.
     if (callerId) {
-      fetch(`${SB_URL}/rest/v1/ai_usage`, {
-        method: 'POST',
-        headers: { apikey: SB_ANON, Authorization: `Bearer ${SB_ANON}`,
-                   'Content-Type': 'application/json', Prefer: 'return=minimal' },
-        body: JSON.stringify({
-          user_id: callerId,
-          feature: typeof feature === 'string' ? feature.slice(0, 40) : null,
-          model: body.model,
-          input_tokens: (data.usage && data.usage.input_tokens) || 0,
-          output_tokens: (data.usage && data.usage.output_tokens) || 0,
-          cache_read: (data.usage && data.usage.cache_read_input_tokens) || 0,
-          web_searches: (data.usage && data.usage.server_tool_use
-            && data.usage.server_tool_use.web_search_requests) || 0,
-          ms: Date.now() - started,
-          ok: true,
-        }),
-      }).catch(() => {});
+      const ac = new AbortController();
+      const killLog = setTimeout(() => ac.abort(), 2500);
+      try {
+        const lg = await fetch(`${SB_URL}/rest/v1/ai_usage`, {
+          signal: ac.signal,
+          method: 'POST',
+          headers: { apikey: SB_ANON, Authorization: `Bearer ${SB_ANON}`,
+                     'Content-Type': 'application/json', Prefer: 'return=minimal' },
+          body: JSON.stringify({
+            user_id: callerId,
+            feature: typeof feature === 'string' ? feature.slice(0, 40) : null,
+            model: body.model,
+            input_tokens: (data.usage && data.usage.input_tokens) || 0,
+            output_tokens: (data.usage && data.usage.output_tokens) || 0,
+            cache_read: (data.usage && data.usage.cache_read_input_tokens) || 0,
+            web_searches: (data.usage && data.usage.server_tool_use
+              && data.usage.server_tool_use.web_search_requests) || 0,
+            ms: Date.now() - started,
+            ok: true,
+          }),
+        });
+        if (!lg.ok) {
+          console.error('ai_usage insert failed:', lg.status, (await lg.text()).slice(0, 300));
+        }
+      } catch (e) {
+        console.error('ai_usage insert threw:', e.name === 'AbortError' ? 'timed out after 2.5s' : e.message);
+      } finally {
+        clearTimeout(killLog);
+      }
     }
 
     return res.status(200).json({
