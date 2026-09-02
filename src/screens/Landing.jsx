@@ -243,19 +243,19 @@ function Landing({ onPath }) {
           <div style={{ display: "flex", gap: 4 }}>
             {[BRAND.red, BRAND.yellow, BRAND.blue, BRAND.green].map((c, i) => <div key={i} style={{ width: 7, height: 7, borderRadius: "50%", background: c }} />)}
           </div>
-          For content agencies
+          Human-made content, AI-kept order
         </div>
 
         <div style={{ fontSize: 42, fontWeight: 500, lineHeight: 1.14, letterSpacing: -1.2, color: "#111", marginBottom: 18 }}>
           Know where every video is.<br />
-          For{" "}
-          <span style={{ color: BRAND.red }}>every</span>{" "}
-          <span style={{ color: BRAND.blue }}>single</span>{" "}
-          <span style={{ color: BRAND.green }}>client.</span>
+          And{" "}
+          <span style={{ color: BRAND.red }}>what</span>{" "}
+          <span style={{ color: BRAND.blue }}>it</span>{" "}
+          <span style={{ color: BRAND.green }}>did.</span>
         </div>
 
         <div style={{ fontSize: 15.5, color: "#555", lineHeight: 1.7, maxWidth: 520, margin: "0 auto 30px" }}>
-          A board that runs brief to published, a review room where notes pin to the exact second of the cut, and reports a client can actually read. For agencies who outgrew the spreadsheet.
+          A board that runs brief to published, a review room where notes pin to the exact second of the cut, and reports a client can actually read &mdash; whether that client is your own company or your fiftieth.
         </div>
 
         <div style={{ display: "flex", gap: 10, justifyContent: "center", marginBottom: 14, flexWrap: "wrap" }}>
@@ -263,6 +263,74 @@ function Landing({ onPath }) {
           <button onClick={() => document.getElementById("pillars")?.scrollIntoView({ behavior: "smooth" })} style={{ padding: "12px 20px", background: "none", color: "#111", border: "1px solid #DDD", borderRadius: 8, fontSize: 14, cursor: "pointer" }}>See what it does</button>
         </div>
         <div style={{ fontSize: 11, color: "#AAA" }}>Free for one brand, forever. No card.</div>
+      </div>
+
+      {/* Two ways in. Whoever you are, one of these sentences is about you —
+          which is the job the old hero was failing at, because it only ever
+          described the agency. */}
+      <div style={{ borderTop: "0.5px solid #E8E8E8", background: "#FFF", padding: "44px 32px 48px" }}>
+        <div style={{ maxWidth: 880, margin: "0 auto" }}>
+          <div style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: 1, color: "#AAA", marginBottom: 8, textAlign: "center" }}>Which one are you</div>
+          <div style={{ fontSize: 23, fontWeight: 500, color: "#111", letterSpacing: -0.5, marginBottom: 6, lineHeight: 1.3, textAlign: "center" }}>
+            One brand, or somebody else&rsquo;s.
+          </div>
+          <div style={{ fontSize: 13.5, color: "#777", marginBottom: 26, textAlign: "center", maxWidth: 500, margin: "0 auto 26px", lineHeight: 1.6 }}>
+            It is the same app either way. What changes is how much of it you need.
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: narrow ? "1fr" : "1fr 1fr", gap: 14 }}>
+            {[
+              {
+                id: "free", accent: BRAND.blue, who: "I run one brand",
+                sub: "In-house marketer, founder, or someone running the content for a single company.",
+                body: "Your pipeline, your scripts, your shoot plans and your own numbers. Nobody calls anybody a client, because there is only you and the brand you work on.",
+                foot: "Free for ten cards in progress. $30 a month when you want the ceiling off.",
+                cta: "Start free",
+              },
+              {
+                id: "agency", accent: C.purple, who: "I run content for clients",
+                sub: "An agency, or a freelancer with more than one brand to keep straight.",
+                body: "Every client on one calendar, a team with roles and approvals, and reporting per client that you can put in front of them without rewriting it first.",
+                foot: "Everything above, without the ceilings, across as many brands as you carry.",
+                cta: "See the Agency plan",
+              },
+            ].map(o => (
+              <div key={o.id} style={{ border: "0.5px solid #E8E8E8", borderRadius: 14, background: "#FFF", padding: "22px 22px 20px", display: "flex", flexDirection: "column" }}>
+                <div style={{ display: "flex", gap: 4, marginBottom: 14 }}>
+                  <div style={{ width: 22, height: 3, borderRadius: 2, background: o.accent }} />
+                  <div style={{ width: 7, height: 3, borderRadius: 2, background: "#E8E8E8" }} />
+                </div>
+                <div style={{ fontSize: 18, fontWeight: 600, color: "#111", letterSpacing: -0.3, marginBottom: 5 }}>{o.who}</div>
+                <div style={{ fontSize: 12.5, color: "#888", lineHeight: 1.55, marginBottom: 11 }}>{o.sub}</div>
+                <div style={{ fontSize: 13.5, color: "#555", lineHeight: 1.65, marginBottom: 14 }}>{o.body}</div>
+                <div style={{ fontSize: 11.5, color: "#999", lineHeight: 1.55, marginBottom: 16, marginTop: "auto" }}>{o.foot}</div>
+                <button onClick={() => onPath(o.id)} style={{ padding: "11px 18px", background: "#111", color: "white", border: "none", borderRadius: 8, fontSize: 13.5, fontWeight: 500, cursor: "pointer", width: "100%" }}>{o.cta} &rarr;</button>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* The one claim nobody else on this market is making, and it happens to
+          be true of the code: the script assistant is forbidden from writing. */}
+      <div style={{ borderTop: "0.5px solid #E8E8E8", background: "#FCFCFD", padding: "48px 32px" }}>
+        <div style={{ maxWidth: 640, margin: "0 auto", textAlign: "center" }}>
+          <div style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: 1, color: "#AAA", marginBottom: 10 }}>Where the AI stops</div>
+          <div style={{ fontSize: 25, fontWeight: 500, color: "#111", letterSpacing: -0.6, lineHeight: 1.3, marginBottom: 14 }}>
+            It will not write your video for you.
+          </div>
+          <div style={{ fontSize: 14.5, color: "#555", lineHeight: 1.75, marginBottom: 18 }}>
+            The script assistant is built to ask what your hook is actually promising and whether the ending
+            earns it. It is not allowed to write the line &mdash; not as a limitation, as the point. Content that
+            sounds like everybody else&rsquo;s is worth nothing, and that is precisely what you get from a machine
+            writing your scripts.
+          </div>
+          <div style={{ fontSize: 13.5, color: "#777", lineHeight: 1.7 }}>
+            What it does instead is the work nobody wants: keeping fifty cards straight, remembering which
+            opening travelled furthest, checking a creator&rsquo;s profile actually exists, and adding up the month
+            so you can show somebody. <strong style={{ color: "#111", fontWeight: 600 }}>You make it. It keeps it in order and tells you the truth about it.</strong>
+          </div>
+        </div>
       </div>
 
       {/* Pillars — click one, look at it. */}
