@@ -70,7 +70,7 @@ function ScriptDocument({card,analytics,onSave,onClose}){
     setChatLoading(true);
     try{
       const sys=`You are a creative direction assistant. Give brief, specific directions — never write the script. Under 50 words. End with one question. Platform: ${platform}. Video: "${card.title}". Current hook: "${sections.hook||"empty"}"`;
-      const r=await fetch("/api/chat",{method:"POST",headers:aiHeaders(),body:JSON.stringify({messages:[{role:"user",content:userMsg}],systemPrompt:sys})});
+      const r=await fetch("/api/chat",{method:"POST",headers:aiHeaders(),body:JSON.stringify({feature:"script",messages:[{role:"user",content:userMsg}],systemPrompt:sys})});
       const d=await r.json();
       if(d.content)setChatMsgs(p=>[...p,{role:"ai",text:d.content}]);
     }catch(e){setChatMsgs(p=>[...p,{role:"ai",text:"Try again in a moment."}]);}

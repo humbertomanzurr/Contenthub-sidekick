@@ -188,7 +188,7 @@ The four queries must attack the subject from different directions, not rephrase
     try{
       const r=await fetch("/api/chat",{
         method:"POST",headers:aiHeaders(),
-        body:JSON.stringify({messages:[{role:"user",content:prompt}],systemPrompt:sys})
+        body:JSON.stringify({feature:"campaign",messages:[{role:"user",content:prompt}],systemPrompt:sys})
       });
       const d=await readReply(r);
       if(!d||d.error||!d.content)return null;

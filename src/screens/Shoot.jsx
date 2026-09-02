@@ -103,7 +103,7 @@ Body: ${(sections.body||"").slice(0,300)||"not written"}
 
 Return ONLY a JSON array of 5 short phrases, 1-3 words each, describing the SOUND not the topic. Think tempo, mood, texture — "eerie slow build", "soft morning", "punchy upbeat". No hashtags, no song names, no explanation.`;
       const r=await fetch("/api/chat",{method:"POST",headers:aiHeaders(),
-        body:JSON.stringify({messages:[{role:"user",content:"Suggest sound search phrases."}],systemPrompt:sys})});
+        body:JSON.stringify({feature:"shoot",messages:[{role:"user",content:"Suggest sound search phrases."}],systemPrompt:sys})});
       const raw=await r.text();
       let d;try{d=JSON.parse(raw);}catch(e){d=null;}
       if(d&&d.content){
@@ -127,7 +127,7 @@ Return ONLY a JSON array of 5 short phrases, 1-3 words each, describing the SOUN
     try{
       const sys=`You help someone plan a video shoot by asking questions — never by planning it for them. Under 50 words. End with one question. Platform: ${platform}. Video: "${card.title}". They have ${plan.shots.length} shots, ${plan.talent.length} talent, ${plan.locations.length} locations.`;
       const r=await fetch("/api/chat",{method:"POST",headers:aiHeaders(),
-        body:JSON.stringify({messages:[{role:"user",content:msg}],systemPrompt:sys})});
+        body:JSON.stringify({feature:"shoot",messages:[{role:"user",content:msg}],systemPrompt:sys})});
       const raw=await r.text();
       let d;try{d=JSON.parse(raw);}catch(e){d=null;}
       setChat(c=>[...c,{role:"ai",text:(d&&d.content)?d.content:"Try that again in a moment."}]);
