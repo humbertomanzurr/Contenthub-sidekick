@@ -53,6 +53,7 @@ function CreatorHub({workspaceId,clients}){
   const[results,setResults]=useState([]);
   const[searching,setSearching]=useState(false);
   const[searchErr,setSearchErr]=useState(null);
+  const[searchRaw,setSearchRaw]=useState("");
   const[selected,setSelected]=useState([]);
   const[linkInput,setLinkInput]=useState("");
   const[linkErr,setLinkErr]=useState(null);
@@ -105,7 +106,7 @@ function CreatorHub({workspaceId,clients}){
   const runSearch=async()=>{
     const q=(query||composed).trim();
     if(!q||searching)return;
-    setSearching(true);setSearchErr(null);setResults([]);setSelected([]);
+    setSearching(true);setSearchErr(null);setSearchRaw("");setResults([]);setSelected([]);
     try{
       const sys=`You find real content creators on social media.
 
@@ -123,14 +124,14 @@ Return ONLY a JSON array, no markdown:
 
 Up to 12 results.`;
       const r=await fetch("/api/chat",{method:"POST",headers:aiHeaders(),
-        body:JSON.stringify({feature:"creators",messages:[{role:"user",content:q}],systemPrompt:sys,useWebSearch:true,maxUses:3})});
+        body:JSON.stringify({feature:"creators",messages:[{role:"user",content:q}],systemPrompt:sys,useWebSearch:true,maxUses:5})});
       const raw=await r.text();
       let d;try{d=JSON.parse(raw);}catch(e){d={error:raw.slice(0,140)};}
       if(d.error){setSearchErr(String(d.error).slice(0,180));setSearching(false);return;}
       const clean=(d.content||"").replace(/```json|```/g,"").trim();
       const a=clean.indexOf("["),b=clean.lastIndexOf("]");
-      let list=[];
-      if(a>=0&&b>a){try{list=JSON.parse(clean.slice(a,b+1));}catch(e){}}
+      let list=[],parseErr="";
+      if(a>=0&&b>a){try{list=JSON.parse(clean.slice(a,b+1));}catch(e){parseErr=e.message||"unparseable";}}
       const seen=new Set();
       const verified=(Array.isArray(list)?list:[]).map(x=>{
         const p=parseProfile(x.profile_url);
@@ -140,7 +141,25 @@ Up to 12 results.`;
         return{...p,why:x.why||""};
       }).filter(Boolean);
       setResults(verified);
-      if(!verified.length)setSearchErr("Nothing came back with a real profile link.");
+      // Four different things can go wrong here and they need four different
+      // answers. Collapsing them into one sentence tells you nothing about
+      // which one you are looking at.
+      if(!verified.length){
+        const found=Array.isArray(list)?list.length:0;
+        const why=!clean                 ? "the model replied with nothing at all"
+                 :a<0||b<=a              ? "the reply was not a JSON list"
+                 :parseErr               ? `the list would not parse (${parseErr})`
+                 :!found                 ? "the list came back empty"
+                 : `${found} name${found===1?"":"s"} came back, but not one had a real profile link on TikTok, Instagram, YouTube or Facebook`;
+        const searched=typeof d.searchCalls==="number"
+          ? (d.searchCalls===0 ? " — and it never ran a web search"
+                               : ` — after ${d.searchCalls} web search${d.searchCalls===1?"":"es"}`)
+          : "";
+        const errs=(d.searchErrors&&d.searchErrors.length)
+          ? ` — search errors: ${d.searchErrors.join("; ").slice(0,140)}` : "";
+        setSearchErr(why+searched+errs);
+        setSearchRaw(clean.slice(0,700));
+      } else setSearchRaw("");
     }catch(e){setSearchErr(e.message||"Error");}
     setSearching(false);
   };
@@ -290,6 +309,13 @@ Up to 12 results.`;
         <Card style={{marginBottom:16}}>
           <div style={{fontSize:12,color:C.red,marginBottom:4,fontWeight:600}}>{"Nothing usable came back"}</div>
           <div style={{fontSize:11,color:C.muted,lineHeight:1.55}}>{searchErr}</div>
+          {searchRaw&&<details style={{marginTop:8}}>
+            <summary style={{fontSize:10.5,color:C.muted,cursor:"pointer",userSelect:"none"}}>
+              {"What the model actually replied"}</summary>
+            <pre style={{fontSize:10,lineHeight:1.5,color:C.muted,background:"#F8FAFC",
+              border:"1px solid #E2E8F0",borderRadius:6,padding:"8px 10px",marginTop:6,
+              whiteSpace:"pre-wrap",wordBreak:"break-word",maxHeight:220,overflow:"auto"}}>{searchRaw}</pre>
+          </details>}
         </Card>
       )}
 
