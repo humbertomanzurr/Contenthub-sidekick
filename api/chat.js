@@ -209,10 +209,18 @@ export default async function handler(req, res) {
     // on repeat runs -- so treat these as transient. They still burn the
     // max_uses budget when they happen, which is what turns one bad moment
     // into an answer with no results at all.
-    const searchErrors = blocks
-      .filter(b => b.type === 'web_search_tool_result')
+    const searchResults = blocks.filter(b => b.type === 'web_search_tool_result');
+    const searchErrors = searchResults
       .map(b => (b.content && !Array.isArray(b.content) && b.content.error_code) || null)
       .filter(Boolean);
+
+    // searchErrors only ever caught the blocks that carried an error object,
+    // so a search returning zero hits looked exactly like one returning ten.
+    // "Searched 7 times" was true and useless. Per-search outcomes are the
+    // difference between "the web has nothing" and "the tool never ran".
+    const searchDetail = searchResults.map(b => Array.isArray(b.content)
+      ? { results: b.content.length }
+      : { error: (b.content && b.content.error_code) || 'unknown' });
 
     // Record what this cost. Awaited, not fire-and-forget: this runs on Vercel,
     // where the function is frozen the moment the response is sent, so an
@@ -259,6 +267,7 @@ export default async function handler(req, res) {
       content: text,
       searchCalls,
       searchErrors,
+      searchDetail,
       // What this call actually cost, passed straight through. Billable web
       // searches are counted separately from searchCalls because a search
       // that errors is not billed, and because search carries a per-request

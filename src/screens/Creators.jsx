@@ -124,7 +124,7 @@ Return ONLY a JSON array, no markdown:
 
 Up to 12 results.`;
       const r=await fetch("/api/chat",{method:"POST",headers:aiHeaders(),
-        body:JSON.stringify({feature:"creators",messages:[{role:"user",content:q}],systemPrompt:sys,useWebSearch:true,maxUses:5})});
+        body:JSON.stringify({feature:"creators",messages:[{role:"user",content:q}],systemPrompt:sys,useWebSearch:true,maxUses:8})});
       const raw=await r.text();
       let d;try{d=JSON.parse(raw);}catch(e){d={error:raw.slice(0,140)};}
       if(d.error){setSearchErr(String(d.error).slice(0,180));setSearching(false);return;}
@@ -151,13 +151,20 @@ Up to 12 results.`;
                  :parseErr               ? `the list would not parse (${parseErr})`
                  :!found                 ? "the list came back empty"
                  : `${found} name${found===1?"":"s"} came back, but not one had a real profile link on TikTok, Instagram, YouTube or Facebook`;
-        const searched=typeof d.searchCalls==="number"
-          ? (d.searchCalls===0 ? " — and it never ran a web search"
-                               : ` — after ${d.searchCalls} web search${d.searchCalls===1?"":"es"}`)
-          : "";
-        const errs=(d.searchErrors&&d.searchErrors.length)
-          ? ` — search errors: ${d.searchErrors.join("; ").slice(0,140)}` : "";
-        setSearchErr(why+searched+errs);
+        const det=Array.isArray(d.searchDetail)?d.searchDetail:[];
+        const ran=det.filter(x=>typeof x.results==="number");
+        const hits=ran.reduce((n,x)=>n+x.results,0);
+        const errs={};
+        det.filter(x=>x.error).forEach(x=>{errs[x.error]=(errs[x.error]||0)+1;});
+        const bad=Object.keys(errs).map(k=>`${errs[k]}× ${k}`).join(", ");
+        // "Searched 7 times" is true whether the web gave back everything or
+        // nothing. The counts are what separate the two.
+        const searched=!det.length
+          ? (d.searchCalls?` — ${d.searchCalls} search${d.searchCalls===1?"":"es"} were attempted but none returned a result block`
+                          :" — and it never ran a web search")
+          : ` — ${ran.length} of ${det.length} searches returned ${hits} result${hits===1?"":"s"} in total`
+            +(bad?`, and ${bad}`:"");
+        setSearchErr(why+searched);
         setSearchRaw(clean.slice(0,700));
       } else setSearchRaw("");
     }catch(e){setSearchErr(e.message||"Error");}
