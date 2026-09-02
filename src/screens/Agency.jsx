@@ -9,7 +9,7 @@ import { PLANS, cardLimitReason, isSolo, planOf } from "../lib/plan";
 import { AttachVideoModal, NotesPanel, ReviewRoom } from "./AgencyReview";
 import { AddVideoModal, GoalModal, MetricsModal } from "./Business";
 import { CampaignCreator } from "./Campaigns";
-import { CreatorHub } from "./Creators";
+import { CampaignWorkspace } from "./CampaignWorkspace";
 import { ScriptDocument } from "./Script";
 import { ShootPlanner } from "./Shoot";
 import { AIBoxIcon, BRAND, Btn, C, Card, Logo, PlatformIcon, inp, sh, shMd } from "../ui/theme";
@@ -1165,8 +1165,8 @@ function AgencyApp({user,profile,onLogout}){
         </div>
         <div style={{display:"flex",alignItems:"center",gap:3}}>
           {(solo
-              ?[["dashboard","Pipeline"],["analytics","Analytics",!plan.analytics],["talent","Talent",!plan.talent]]
-              :[["dashboard","Dashboard"],["brainstorm","Brainstorm"],["talent","Talent",!plan.talent],["analytics","Analytics"]]
+              ?[["dashboard","Pipeline"],["campaign","Campaigns",!plan.talent],["analytics","Analytics",!plan.analytics]]
+              :[["dashboard","Dashboard"],["campaign","Campaigns"],["analytics","Analytics"]]
             ).map(([id,label,locked])=>(
             locked
             ?<button key={id} onClick={()=>setUpsell({locked:label,title:`${label} is part of Business`,body:`Upgrade to see ${label.toLowerCase()} for your brand. Everything you have built stays exactly where it is.`})}
@@ -1225,10 +1225,9 @@ function AgencyApp({user,profile,onLogout}){
           :page==="settings"
           ?<SettingsPage workspaceId={wsId} wsName={wsName} user={user} profile={profile}
              tab={settingsTab} onTab={setSettingsTab} clients={clients} onReload={load}/>
-          :page==="talent"
-          ?<CreatorHub workspaceId={wsId} clients={clients}/>
-          :page==="brainstorm"
-          ?<AgencyBrainstorm clients={clients} videos={videos} userId={user.id} month={month} onSendToPipeline={(clientId,ideas)=>{ideas.forEach(v=>addVideo({...v,clientId}));}}/>
+          :page==="campaign"
+          ?<CampaignWorkspace clients={clients} videos={videos} userId={user.id} month={month}
+             onSendToPipeline={(clientId,ideas)=>{ideas.forEach(v=>addVideo({...v,clientId}));}}/>
           :<AgencyDashboard clientError={clientError} clients={clients} videos={videos} targets={targets} month={month} onMonthChange={setMonth} onSelectClient={c=>{setSelectedClient(c);}} onAddClient={addClient} onSetTarget={setTarget} onReschedule={reschedule}/>
         }
       </div>
